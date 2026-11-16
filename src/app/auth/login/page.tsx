@@ -19,14 +19,29 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
+    const cleanEmail = email.trim().toLowerCase();
+
     try {
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: cleanEmail,
         password,
       });
 
       if (signInError) {
-        setError(signInError.message);
+        if (
+          signInError.message.toLowerCase().includes("invalid login credentials") ||
+          signInError.status === 400
+        ) {
+          setError(
+            "Invalid email or password. If you just registered, please verify your email or create an account if you haven't yet."
+          );
+        } else if (signInError.message.toLowerCase().includes("email not confirmed")) {
+          setError(
+            "Your email has not been confirmed yet. Please check your inbox for the confirmation link."
+          );
+        } else {
+          setError(signInError.message);
+        }
         return;
       }
 
