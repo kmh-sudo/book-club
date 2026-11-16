@@ -13,6 +13,8 @@ import {
   Sparkles,
   Flame,
   CheckCircle2,
+  Database,
+  ArrowRight,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -27,10 +29,12 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
+  const [schemaMissing, setSchemaMissing] = useState(false);
 
   useEffect(() => {
     async function loadSessions() {
       setLoading(true);
+      setSchemaMissing(false);
       try {
         // Fetch sessions
         const { data: sessionData, error } = await supabase
@@ -39,13 +43,18 @@ export default function HomePage() {
           .order("created_at", { ascending: false });
 
         if (error) {
-          console.error("Error loading sessions:", error);
+          // Check for missing table error (PGRST205)
+          if (error.code === "PGRST205" || error.message?.includes("reading_sessions")) {
+            setSchemaMissing(true);
+          } else {
+            console.error("Error loading sessions:", error);
+          }
           setLoading(false);
           return;
         }
 
         // Fetch counts and member progress
-        const sessionIds = (sessionData || []).map((s) => s.id);
+        const sessionIds = (sessionData || []).map((s: ReadingSession) => s.id);
         if (sessionIds.length === 0) {
           setSessions([]);
           setLoading(false);
@@ -60,14 +69,14 @@ export default function HomePage() {
         const memberMap: Record<string, number> = {};
         const userProgressMap: Record<string, SessionMember> = {};
 
-        (membersData || []).forEach((m) => {
+        ((membersData || []) as SessionMember[]).forEach((m) => {
           memberMap[m.session_id] = (memberMap[m.session_id] || 0) + 1;
           if (user && m.user_id === user.id) {
-            userProgressMap[m.session_id] = m as SessionMember;
+            userProgressMap[m.session_id] = m;
           }
         });
 
-        const enriched = (sessionData || []).map((s) => ({
+        const enriched = (sessionData || []).map((s: ReadingSession) => ({
           ...s,
           memberCount: memberMap[s.id] || 0,
           userProgress: userProgressMap[s.id] || null,
@@ -98,6 +107,30 @@ export default function HomePage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 md:py-10 space-y-10">
+      {/* Missing Schema Banner */}
+      {schemaMissing && (
+        <div className="p-5 sm:p-6 bg-amber-500/10 border border-amber-500/30 rounded-3xl space-y-3">
+          <div className="flex items-center gap-2.5 text-amber-800 dark:text-amber-300">
+            <Database className="w-5 h-5 flex-shrink-0" />
+            <h3 className="font-semibold text-sm">Supabase Tables Need Setup</h3>
+          </div>
+          <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-300 leading-relaxed">
+            The database table <code className="px-1.5 py-0.5 bg-amber-200/50 rounded font-mono text-xs">reading_sessions</code> was not found on your Supabase project. To initialize the database schema, run the script provided in <code className="px-1.5 py-0.5 bg-amber-200/50 rounded font-mono text-xs">supabase/schema.sql</code> in your Supabase SQL Editor.
+          </p>
+          <div className="pt-1">
+            <a
+              href="https://supabase.com/dashboard/project/vztoznhlclljtllrybjk/sql/new"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors"
+            >
+              <span>Open Supabase SQL Editor</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-500/15 via-rose-500/10 to-amber-200/20 border border-amber-200/60 dark:border-stone-800 p-8 sm:p-12 text-center md:text-left flex flex-col md:flex-row items-center justify-between gap-8">
         <div className="max-w-xl space-y-4">
