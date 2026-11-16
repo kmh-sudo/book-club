@@ -5,6 +5,10 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { Comment, CommentReaction, Profile } from "@/types/database";
 import { formatTimeAgo } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import {
   MessageSquare,
   Send,
@@ -52,10 +56,8 @@ export function DiscussionThread({
 
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
-  // Fetch comments and reactions
   const loadComments = async () => {
     try {
-      // 1. Get comments for this session
       const { data: commentsData, error: commentsError } = await supabase
         .from("comments")
         .select(`
@@ -67,8 +69,7 @@ export function DiscussionThread({
 
       if (commentsError) throw commentsError;
 
-      // 2. Get reactions for all comments in this session
-      const commentIds = (commentsData || []).map((c) => c.id);
+      const commentIds = (commentsData || []).map((c: Comment) => c.id);
       let reactionsData: CommentReaction[] = [];
 
       if (commentIds.length > 0) {
@@ -76,11 +77,10 @@ export function DiscussionThread({
           .from("comment_reactions")
           .select("*")
           .in("comment_id", commentIds);
-        reactionsData = reacts || [];
+        reactionsData = (reacts as CommentReaction[]) || [];
       }
 
-      // Group reactions by comment_id
-      const formatted: EnrichedComment[] = (commentsData || []).map((c) => {
+      const formatted: EnrichedComment[] = ((commentsData || []) as (Comment & { author?: Profile })[]).map((c) => {
         const commentReactions = reactionsData.filter((r) => r.comment_id === c.id);
 
         const reactions = ALLOWED_EMOJIS.map((emoji) => {
@@ -110,7 +110,6 @@ export function DiscussionThread({
   useEffect(() => {
     loadComments();
 
-    // Subscribe to realtime updates for comments & reactions
     const commentChannel = supabase
       .channel(`discussion-${sessionId}`)
       .on(
@@ -169,7 +168,6 @@ export function DiscussionThread({
       setIsSpoiler(false);
       await loadComments();
 
-      // Scroll to bottom
       commentsEndRef.current?.scrollIntoView({ behavior: "smooth" });
     } catch (err: unknown) {
       console.error(err);
@@ -186,7 +184,7 @@ export function DiscussionThread({
   const handleToggleReaction = async (commentId: string, emoji: string) => {
     if (!user) return;
     if (!isMember) {
-      alert("Please join the reading session first to react to comments!");
+      alert("Please join this reading session first to react to comments!");
       return;
     }
 
@@ -196,7 +194,6 @@ export function DiscussionThread({
     const reactionState = comment.reactions.find((r) => r.emoji === emoji);
     const hasReacted = reactionState?.hasReacted;
 
-    // Optimistic UI update
     setComments((prev) =>
       prev.map((c) => {
         if (c.id !== commentId) return c;
@@ -216,13 +213,11 @@ export function DiscussionThread({
 
     try {
       if (hasReacted) {
-        // Remove reaction
         await supabase
           .from("comment_reactions")
           .delete()
           .match({ comment_id: commentId, user_id: user.id, emoji });
       } else {
-        // Add reaction
         await supabase.from("comment_reactions").insert({
           comment_id: commentId,
           user_id: user.id,
@@ -231,7 +226,6 @@ export function DiscussionThread({
       }
     } catch (err) {
       console.error("Reaction failed:", err);
-      // Reload from server in case of rollback
       loadComments();
     }
   };
@@ -241,11 +235,11 @@ export function DiscussionThread({
   };
 
   return (
-    <div className="bg-white dark:bg-stone-900 rounded-3xl border border-stone-200/90 dark:border-stone-800 p-6 sm:p-8 space-y-6 shadow-sm">
+    <Card className="p-6 sm:p-8 space-y-6 rounded-3xl">
       {/* Thread Header */}
       <div className="flex items-center justify-between pb-4 border-b border-stone-100 dark:border-stone-800">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-amber-100 dark:bg-stone-800 text-amber-700 dark:text-amber-400">
+          <div className="p-2.5 rounded-2xl bg-amber-100 dark:bg-stone-800 text-amber-700 dark:text-amber-400">
             <MessageSquare className="w-5 h-5" />
           </div>
           <div>
@@ -253,13 +247,13 @@ export function DiscussionThread({
               Session Discussion
             </h3>
             <p className="text-xs text-stone-500">
-              Single-thread conversation for this book
+              Focused single thread for this book
             </p>
           </div>
         </div>
-        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300">
+        <Badge variant="outline" className="text-xs font-semibold">
           {comments.length} {comments.length === 1 ? "comment" : "comments"}
-        </span>
+        </Badge>
       </div>
 
       {/* Comment List */}
@@ -285,15 +279,15 @@ export function DiscussionThread({
                 {/* Author Info & Meta */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-amber-200 dark:bg-stone-700 text-amber-800 dark:text-amber-300 flex items-center justify-center font-bold text-xs uppercase">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-xs uppercase shadow-sm">
                       {comment.author?.username?.charAt(0) || "U"}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-stone-800 dark:text-stone-200">
+                        <span className="text-xs font-bold text-stone-900 dark:text-stone-100">
                           {comment.author?.full_name || comment.author?.username || "Reader"}
                         </span>
-                        <span className="text-[10px] text-stone-400">
+                        <span className="text-[10px] text-amber-600 font-medium">
                           @{comment.author?.username || "member"}
                         </span>
                       </div>
@@ -305,33 +299,35 @@ export function DiscussionThread({
 
                   {/* Chapter badge */}
                   {comment.chapter_reference && (
-                    <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100/80 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 text-[11px] font-semibold">
+                    <Badge variant="secondary" className="gap-1 text-[11px] font-bold">
                       <Bookmark className="w-3 h-3 text-amber-600" />
                       <span>Chapter {comment.chapter_reference}</span>
-                    </div>
+                    </Badge>
                   )}
                 </div>
 
                 {/* Comment Content */}
                 <div className="relative">
                   {comment.is_spoiler && (
-                    <div className="mb-2 flex items-center gap-1.5">
-                      <button
+                    <div className="mb-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => toggleSpoiler(comment.id)}
-                        className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1"
+                        className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 h-auto p-0 hover:bg-transparent"
                       >
                         {isSpoilerHidden ? (
                           <>
-                            <Eye className="w-3.5 h-3.5" />
+                            <Eye className="w-3.5 h-3.5 mr-1" />
                             <span>Contains spoiler (click to show)</span>
                           </>
                         ) : (
                           <>
-                            <EyeOff className="w-3.5 h-3.5" />
+                            <EyeOff className="w-3.5 h-3.5 mr-1" />
                             <span>Hide spoiler</span>
                           </>
                         )}
-                      </button>
+                      </Button>
                     </div>
                   )}
 
@@ -351,11 +347,11 @@ export function DiscussionThread({
                       key={emoji}
                       onClick={() => handleToggleReaction(comment.id, emoji)}
                       disabled={!isMember}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
                         hasReacted
-                          ? "bg-amber-100 border-amber-300 text-amber-900 dark:bg-amber-950/80 dark:border-amber-700 dark:text-amber-200 scale-105"
+                          ? "bg-amber-100/90 border-amber-300 text-amber-900 dark:bg-amber-950/80 dark:border-amber-700 dark:text-amber-200 scale-105 shadow-sm"
                           : "bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
-                      } ${!isMember ? "opacity-75 cursor-not-allowed" : "active:scale-95"}`}
+                      } ${!isMember ? "opacity-60 cursor-not-allowed" : "active:scale-95"}`}
                     >
                       <span>{emoji}</span>
                       {count > 0 && <span className="text-[11px] font-bold">{count}</span>}
@@ -378,61 +374,57 @@ export function DiscussionThread({
       {/* Composer Section */}
       <div className="pt-4 border-t border-stone-100 dark:border-stone-800">
         {!user ? (
-          <div className="bg-amber-50/60 dark:bg-stone-800/60 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+          <Card className="p-4 bg-amber-50/60 dark:bg-stone-800/60 border-amber-200/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
             <div>
-              <p className="text-xs font-semibold text-stone-800 dark:text-stone-200">
+              <p className="text-xs font-bold text-stone-900 dark:text-stone-100">
                 Want to join the discussion?
               </p>
               <p className="text-xs text-stone-500">
-                Sign in to post comments and react with members.
+                Sign in to post comments and react with other readers.
               </p>
             </div>
-            <Link
-              href="/auth/login"
-              className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5"
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              Sign In
+            <Link href="/auth/login">
+              <Button size="sm" className="gap-1.5">
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </Button>
             </Link>
-          </div>
+          </Card>
         ) : !isMember ? (
-          <div className="bg-amber-50 dark:bg-stone-800/60 border border-amber-200 dark:border-stone-700 p-4 rounded-2xl text-center space-y-1">
-            <p className="text-xs font-semibold text-amber-900 dark:text-amber-300">
-              Join this reading session to join the conversation
+          <Card className="p-4 bg-amber-50/80 dark:bg-stone-800/60 border-amber-200 dark:border-stone-700 text-center space-y-1">
+            <p className="text-xs font-bold text-amber-900 dark:text-amber-300">
+              Join this reading session to join the discussion
             </p>
             <p className="text-xs text-stone-500">
-              Click &quot;Join Reading Session&quot; above to post comments and react.
+              Click &quot;Join Reading Session&quot; above to post thoughts and react to comments.
             </p>
-          </div>
+          </Card>
         ) : (
           <form onSubmit={handlePostComment} className="space-y-3">
             {error && (
-              <div className="p-2.5 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs flex items-center gap-2">
+              <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 <span>{error}</span>
               </div>
             )}
 
-            <div className="relative">
-              <textarea
-                rows={3}
-                required
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Share your thoughts, quotes, or chapter reflections..."
-                className="w-full px-4 py-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-sm resize-none"
-              />
-            </div>
+            <Textarea
+              rows={3}
+              required
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Share your thoughts, reactions, or chapter questions..."
+              className="resize-none"
+            />
 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                {/* Optional chapter reference */}
                 <div className="flex items-center gap-1.5 text-xs text-stone-600 dark:text-stone-400">
                   <Bookmark className="w-3.5 h-3.5 text-amber-600" />
                   <select
                     value={chapterRef}
                     onChange={(e) => setChapterRef(e.target.value)}
-                    className="px-2 py-1 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs text-stone-700 dark:text-stone-300 focus:outline-none"
+                    className="px-2.5 py-1.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs text-stone-700 dark:text-stone-300 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   >
                     <option value="">General</option>
                     {Array.from({ length: totalChapters }, (_, i) => i + 1).map((ch) => (
@@ -443,30 +435,30 @@ export function DiscussionThread({
                   </select>
                 </div>
 
-                {/* Spoiler checkbox */}
                 <label className="flex items-center gap-1.5 text-xs text-stone-600 dark:text-stone-400 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={isSpoiler}
                     onChange={(e) => setIsSpoiler(e.target.checked)}
-                    className="rounded text-amber-600 focus:ring-amber-500"
+                    className="rounded text-amber-600 focus:ring-amber-500 h-4 w-4"
                   />
                   <span>Contains spoiler</span>
                 </label>
               </div>
 
-              <button
+              <Button
                 type="submit"
+                size="sm"
                 disabled={submitting || !newComment.trim()}
-                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-all"
+                className="gap-1.5"
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>{submitting ? "Posting..." : "Post"}</span>
-              </button>
+              </Button>
             </div>
           </form>
         )}
       </div>
-    </div>
+    </Card>
   );
 }

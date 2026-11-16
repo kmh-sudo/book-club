@@ -3,7 +3,11 @@
 import { useState } from "react";
 import confetti from "canvas-confetti";
 import { createClient } from "@/lib/supabase/client";
-import { CheckCircle2, ChevronRight, Trophy } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { CheckCircle2, ChevronRight, Trophy, Minus, Plus } from "lucide-react";
 
 interface ProgressUpdaterProps {
   sessionId: string;
@@ -48,8 +52,8 @@ export function ProgressUpdater({
 
       if (completed && !isCompleted) {
         confetti({
-          particleCount: 120,
-          spread: 70,
+          particleCount: 150,
+          spread: 80,
           origin: { y: 0.6 },
         });
       }
@@ -63,66 +67,68 @@ export function ProgressUpdater({
   const percentage = Math.round((currentChapter / totalChapters) * 100);
 
   return (
-    <div className="bg-gradient-to-br from-amber-500/10 via-amber-600/5 to-transparent border border-amber-200/80 dark:border-stone-800 rounded-2xl p-5 space-y-4">
+    <Card className="p-5 sm:p-6 bg-gradient-to-br from-amber-500/10 via-amber-600/5 to-transparent border-amber-200/80 dark:border-stone-800 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">
             Your Reading Progress
           </span>
-          <p className="text-sm font-semibold text-stone-800 dark:text-stone-200">
+          <p className="text-base font-bold text-stone-900 dark:text-stone-100">
             Chapter {currentChapter} of {totalChapters} ({percentage}%)
           </p>
         </div>
         {currentChapter >= totalChapters ? (
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-600 text-white rounded-full text-xs font-bold shadow-sm animate-bounce">
+          <Badge variant="default" className="gap-1.5 px-3 py-1 font-bold text-xs bg-amber-600 animate-bounce">
             <Trophy className="w-3.5 h-3.5" />
-            Completed!
-          </div>
+            Book Completed!
+          </Badge>
         ) : (
-          <span className="text-xs text-stone-500">
-            {totalChapters - currentChapter} chapters left
+          <span className="text-xs font-semibold text-stone-500">
+            {totalChapters - currentChapter} chapters remaining
           </span>
         )}
       </div>
 
       {/* Progress Bar */}
-      <div className="w-full bg-stone-200 dark:bg-stone-800 h-2.5 rounded-full overflow-hidden">
-        <div
-          className="bg-amber-600 h-full rounded-full transition-all duration-300"
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
+      <Progress value={percentage} className="h-2.5" />
 
       {/* Quick Controls */}
       <div className="flex flex-wrap items-center gap-2 pt-1">
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => handleUpdate(currentChapter - 1)}
           disabled={saving || currentChapter <= 0}
-          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:bg-stone-50 disabled:opacity-40 transition-colors"
+          className="rounded-xl gap-1"
         >
-          -1 Ch
-        </button>
+          <Minus className="w-3.5 h-3.5" />
+          <span>-1 Ch</span>
+        </Button>
 
-        <button
+        <Button
+          size="sm"
           onClick={() => handleUpdate(currentChapter + 1)}
           disabled={saving || currentChapter >= totalChapters}
-          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-40 shadow-sm transition-colors flex items-center gap-1"
+          className="rounded-xl gap-1 shadow-sm"
         >
+          <Plus className="w-3.5 h-3.5" />
           <span>+1 Chapter</span>
-          <ChevronRight className="w-3.5 h-3.5" />
-        </button>
+          <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+        </Button>
 
         {currentChapter < totalChapters && (
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => handleUpdate(totalChapters)}
             disabled={saving}
-            className="ml-auto px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 flex items-center gap-1 transition-colors"
+            className="ml-auto rounded-xl gap-1 text-emerald-700 bg-emerald-100/70 hover:bg-emerald-200/70 dark:bg-emerald-950/60 dark:text-emerald-300"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Finished Book</span>
-          </button>
+            <span>Mark Finished</span>
+          </Button>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
