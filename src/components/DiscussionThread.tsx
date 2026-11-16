@@ -239,7 +239,7 @@ export function DiscussionThread({
   };
 
   return (
-    <Card className="flex flex-col h-[750px] p-5 sm:p-6 rounded-3xl border-stone-200/90 dark:border-stone-800 shadow-sm bg-white/90 dark:bg-stone-900/90 backdrop-blur-md">
+    <Card className="flex flex-col h-[600px] lg:h-[calc(100vh-280px)] lg:min-h-[500px] lg:max-h-[800px] p-5 sm:p-6 rounded-3xl border-stone-200/90 dark:border-stone-800 shadow-sm bg-white/90 dark:bg-stone-900/90 backdrop-blur-md">
       {/* Thread Header */}
       <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-stone-100 dark:border-stone-800 flex-shrink-0">
         <div className="flex items-center gap-2.5">
@@ -282,13 +282,13 @@ export function DiscussionThread({
             return (
               <div
                 key={comment.id}
-                className="group relative bg-[#FAF9F6] dark:bg-stone-800/50 rounded-2xl p-3.5 sm:p-4 border border-stone-200/70 dark:border-stone-800 space-y-2.5 transition-all hover:border-amber-300/50 shadow-2xs"
+                className="group relative bg-[#FAF9F6] dark:bg-stone-800/50 rounded-2xl p-3.5 sm:p-4 border border-stone-200/70 dark:border-stone-800 space-y-2.5 transition-all hover:border-amber-300/50 shadow-sm"
               >
                 {/* Author Info & Progress Bar Inline */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-full bg-linear-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-[10px] uppercase flex-shrink-0 shadow-xs">
+                      <div className="w-7 h-7 rounded-full bg-linear-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-[10px] uppercase flex-shrink-0 shadow-sm">
                         {comment.author?.username?.charAt(0) || "U"}
                       </div>
                       <div className="min-w-0">
@@ -381,7 +381,7 @@ export function DiscussionThread({
                       disabled={!isMember}
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-all ${
                         hasReacted
-                          ? "bg-amber-100/90 border-amber-300 text-amber-900 dark:bg-amber-950/80 dark:border-amber-700 dark:text-amber-200 scale-105 shadow-xs"
+                          ? "bg-amber-100/90 border-amber-300 text-amber-900 dark:bg-amber-950/80 dark:border-amber-700 dark:text-amber-200 scale-105 shadow-sm"
                           : "bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
                       } ${!isMember ? "opacity-60 cursor-not-allowed" : "active:scale-95"}`}
                     >

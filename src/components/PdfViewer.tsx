@@ -23,7 +23,7 @@ export function PdfViewer({ pdfUrl, bookTitle }: PdfViewerProps) {
   return (
     <Card
       className={`overflow-hidden rounded-3xl border-stone-200/90 dark:border-stone-800 shadow-md bg-white dark:bg-stone-900 transition-all duration-300 flex flex-col ${
-        isFullscreen ? "fixed inset-4 z-50 shadow-2xl" : "h-[750px]"
+        isFullscreen ? "fixed inset-4 z-50 shadow-2xl" : "h-[600px] lg:h-[calc(100vh-280px)] lg:min-h-[500px] lg:max-h-[800px]"
       }`}
     >
       {/* PDF Header Controls */}
