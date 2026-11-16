@@ -22,6 +22,8 @@ import {
   Upload,
   Users,
   Crown,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 interface MemberWithProfile extends SessionMember {
@@ -46,6 +48,8 @@ export default function SessionDetailPage({
   const [joining, setJoining] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const loadSessionDetails = async () => {
     try {
@@ -210,6 +214,56 @@ export default function SessionDetailPage({
     }
   };
 
+  const handleDeleteSession = async () => {
+    if (!user || !session || user.id !== session.creator_id) return;
+    if (
+      !confirm(
+        `Delete "${session.title}"? This removes the session, its PDF, all comments and reactions. This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setDeleting(true);
+    setActionError(null);
+
+    try {
+      // Best-effort cleanup of the uploaded PDF; the session row is removed below regardless.
+      if (session.pdf_url) {
+        const marker = "/storage/v1/object/public/session_pdfs/";
+        const markerIndex = session.pdf_url.indexOf(marker);
+        if (markerIndex !== -1) {
+          const storagePath = decodeURIComponent(
+            session.pdf_url.slice(markerIndex + marker.length).split("?")[0]
+          );
+          const { error: storageError } = await supabase.storage
+            .from("session_pdfs")
+            .remove([storagePath]);
+          if (storageError) {
+            console.warn("Could not remove session PDF:", storageError);
+          }
+        }
+      }
+
+      const { error: deleteError } = await supabase
+        .from("reading_sessions")
+        .delete()
+        .eq("id", session.id)
+        .eq("creator_id", user.id);
+
+      if (deleteError) throw deleteError;
+
+      router.push("/");
+      router.refresh();
+    } catch (err: unknown) {
+      console.error("Failed to delete session:", err);
+      setActionError(
+        err instanceof Error ? err.message : "Failed to delete this session."
+      );
+      setDeleting(false);
+    }
+  };
+
   /* ── Loading State ── */
   if (loading) {
     return (
@@ -263,6 +317,27 @@ export default function SessionDetailPage({
         </Link>
 
         <div className="flex items-center gap-2">
+          {isCreator && (
+            <>
+              <Link href={`/sessions/${session.id}/edit`}>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-xl">
+                  <Pencil className="w-3.5 h-3.5 text-amber-600" />
+                  Edit
+                </Button>
+              </Link>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDeleteSession}
+                disabled={deleting}
+                className="gap-1.5 text-xs rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/60 dark:text-red-400 dark:hover:bg-red-950/40"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {deleting ? "Deleting…" : "Delete"}
+              </Button>
+            </>
+          )}
+
           {/* Creator PDF Upload if no PDF yet */}
           {isCreator && !session.pdf_url && (
             <label className="cursor-pointer">
@@ -313,6 +388,13 @@ export default function SessionDetailPage({
           )}
         </div>
       </div>
+
+      {/* Action Error */}
+      {actionError && (
+        <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-300 text-xs rounded-xl leading-relaxed">
+          ⚠️ {actionError}
+        </div>
+      )}
 
       {/* Upload Error */}
       {uploadError && (
