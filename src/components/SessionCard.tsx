@@ -29,11 +29,11 @@ export function SessionCard({ session }: SessionCardProps) {
     <Link href={`/sessions/${session.id}`} className="block group">
       <Card className="h-full flex flex-col p-5 hover:shadow-xl hover:shadow-amber-900/5 hover:-translate-y-1 hover:border-amber-400/60 dark:hover:border-amber-600/60 transition-all duration-300 relative overflow-hidden bg-white/80 dark:bg-stone-900/80 backdrop-blur-sm">
         {/* Decorative subtle gradient top accent line */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-amber-600 to-rose-400 opacity-80" />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-amber-400 via-amber-600 to-rose-400 opacity-80" />
 
         <div className="flex items-start gap-4">
           {/* Book Spine / Cover Mockup */}
-          <div className="w-16 h-24 rounded-xl bg-gradient-to-br from-amber-100 via-amber-200 to-amber-300 dark:from-stone-800 dark:via-stone-700 dark:to-stone-800 flex flex-col items-center justify-center p-2 text-center shadow-inner border border-amber-300/40 dark:border-stone-700 flex-shrink-0 group-hover:scale-105 group-hover:rotate-1 transition-all duration-300">
+          <div className="w-16 h-24 rounded-xl bg-linear-to-br from-amber-100 via-amber-200 to-amber-300 dark:from-stone-800 dark:via-stone-700 dark:to-stone-800 flex flex-col items-center justify-center p-2 text-center shadow-inner border border-amber-300/40 dark:border-stone-700 flex-shrink-0 group-hover:scale-105 group-hover:rotate-1 transition-all duration-300">
             <BookOpen className="w-6 h-6 text-amber-800 dark:text-amber-400 mb-1" />
             <span className="text-[10px] font-extrabold text-amber-950 dark:text-amber-200 uppercase tracking-tighter truncate max-w-full">
               {session.total_chapters} Chs

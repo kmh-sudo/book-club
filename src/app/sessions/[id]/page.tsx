@@ -182,7 +182,7 @@ export default function SessionDetailPage({
       <Card className="p-6 sm:p-8 space-y-6 rounded-3xl shadow-sm border-stone-200/90 dark:border-stone-800">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pb-6 border-b border-stone-100 dark:border-stone-800">
           <div className="flex items-start gap-4">
-            <div className="w-20 h-28 rounded-2xl bg-gradient-to-br from-amber-200 via-amber-300 to-amber-500 dark:from-stone-800 dark:to-stone-700 flex flex-col items-center justify-center p-3 text-center shadow-md flex-shrink-0">
+            <div className="w-20 h-28 rounded-2xl bg-linear-to-br from-amber-200 via-amber-300 to-amber-500 dark:from-stone-800 dark:to-stone-700 flex flex-col items-center justify-center p-3 text-center shadow-md flex-shrink-0">
               <BookOpen className="w-8 h-8 text-amber-950 dark:text-amber-200 mb-1" />
               <span className="text-[11px] font-extrabold text-amber-950 dark:text-amber-100 uppercase tracking-tighter">
                 {session.total_chapters} Chs
@@ -311,7 +311,7 @@ export default function SessionDetailPage({
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-[10px] uppercase flex-shrink-0 shadow-sm">
+                        <div className="w-6 h-6 rounded-full bg-linear-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-[10px] uppercase flex-shrink-0 shadow-sm">
                           {mem.profile?.username?.charAt(0) || "R"}
                         </div>
                         <span className="text-xs font-bold truncate text-stone-900 dark:text-stone-100">

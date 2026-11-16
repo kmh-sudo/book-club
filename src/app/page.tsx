@@ -135,7 +135,7 @@ export default function HomePage() {
       )}
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-500/15 via-rose-500/10 to-amber-200/20 border border-amber-200/60 dark:border-stone-800 p-8 sm:p-12 text-center md:text-left flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm">
+      <section className="relative overflow-hidden rounded-3xl bg-linear-to-br from-amber-500/15 via-rose-500/10 to-amber-200/20 border border-amber-200/60 dark:border-stone-800 p-8 sm:p-12 text-center md:text-left flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm">
         <div className="max-w-xl space-y-4">
           <Badge variant="secondary" className="gap-1.5 px-3 py-1 font-bold text-xs uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5 text-amber-600" />
@@ -143,7 +143,7 @@ export default function HomePage() {
           </Badge>
           <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl font-extrabold text-stone-900 dark:text-stone-100 leading-tight">
             Read Together. <br />
-            <span className="bg-gradient-to-r from-amber-600 to-rose-600 bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-amber-600 to-rose-600 bg-clip-text text-transparent">
               Track Chapter by Chapter.
             </span>
           </h1>
@@ -191,7 +191,7 @@ export default function HomePage() {
               <span className="text-amber-700 font-bold">Ch. 12/20</span>
             </div>
             <div className="h-2 w-full bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-amber-500 to-amber-600 rounded-full w-[60%]" />
+              <div className="h-full bg-linear-to-r from-amber-500 to-amber-600 rounded-full w-[60%]" />
             </div>
           </div>
           <div className="flex items-center gap-2 pt-1 text-xs text-stone-500">

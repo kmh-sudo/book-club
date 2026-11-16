@@ -67,7 +67,7 @@ export function ProgressUpdater({
   const percentage = Math.round((currentChapter / totalChapters) * 100);
 
   return (
-    <Card className="p-5 sm:p-6 bg-gradient-to-br from-amber-500/10 via-amber-600/5 to-transparent border-amber-200/80 dark:border-stone-800 space-y-4">
+    <Card className="p-5 sm:p-6 bg-linear-to-br from-amber-500/10 via-amber-600/5 to-transparent border-amber-200/80 dark:border-stone-800 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">

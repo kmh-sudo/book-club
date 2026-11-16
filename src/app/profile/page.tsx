@@ -137,7 +137,7 @@ export default function ProfilePage() {
       <Card className="p-6 sm:p-8 space-y-6 rounded-3xl shadow-sm">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pb-6 border-b border-stone-100 dark:border-stone-800">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-2xl uppercase shadow-md shadow-amber-500/20">
+            <div className="w-16 h-16 rounded-2xl bg-linear-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-2xl uppercase shadow-md shadow-amber-500/20">
               {profile?.username?.charAt(0) || "U"}
             </div>
             <div>

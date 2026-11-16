@@ -279,7 +279,7 @@ export function DiscussionThread({
                 {/* Author Info & Meta */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-xs uppercase shadow-sm">
+                    <div className="w-8 h-8 rounded-full bg-linear-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-xs uppercase shadow-sm">
                       {comment.author?.username?.charAt(0) || "U"}
                     </div>
                     <div>

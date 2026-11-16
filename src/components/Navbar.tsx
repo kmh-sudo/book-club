@@ -23,7 +23,7 @@ export function Navbar() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-amber-500 flex items-center justify-center text-white shadow-md shadow-amber-600/25 group-hover:scale-105 group-hover:rotate-[-2deg] transition-all duration-300">
+          <div className="w-10 h-10 rounded-2xl bg-linear-to-tr from-amber-600 to-amber-500 flex items-center justify-center text-white shadow-md shadow-amber-600/25 group-hover:scale-105 group-hover:rotate-[-2deg] transition-all duration-300">
             <BookOpen className="w-5 h-5" />
           </div>
           <div>
@@ -67,7 +67,7 @@ export function Navbar() {
                 href="/profile"
                 className="flex items-center gap-2.5 p-1.5 pr-3 rounded-xl hover:bg-amber-100/50 dark:hover:bg-stone-800 transition-colors"
               >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                <div className="w-8 h-8 rounded-full bg-linear-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                   {profile?.username?.charAt(0).toUpperCase() || (
                     <User className="w-4 h-4" />
                   )}
