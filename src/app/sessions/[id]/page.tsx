@@ -195,7 +195,13 @@ export default function SessionDetailPage({
     } catch (err: unknown) {
       console.error(err);
       if (err instanceof Error) {
-        setUploadError(err.message);
+        if (err.message.includes("Bucket not found") || (err as { statusCode?: string }).statusCode === "404") {
+          setUploadError(
+            "Storage bucket 'session_pdfs' does not exist in your Supabase project yet. Please run the SQL in supabase/create_pdf_bucket.sql in your Supabase SQL editor to create it."
+          );
+        } else {
+          setUploadError(err.message);
+        }
       } else {
         setUploadError("Failed to upload PDF. Please ensure session_pdfs storage bucket is created.");
       }
