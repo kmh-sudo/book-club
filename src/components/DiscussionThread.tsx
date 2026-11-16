@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import {
   MessageSquare,
   Send,
@@ -17,6 +18,7 @@ import {
   Bookmark,
   LogIn,
   AlertCircle,
+  Trophy,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -26,6 +28,7 @@ interface DiscussionThreadProps {
   sessionId: string;
   isMember: boolean;
   totalChapters: number;
+  memberProgressMap?: Record<string, { current_chapter: number; is_completed: boolean }>;
 }
 
 interface EnrichedComment extends Comment {
@@ -41,6 +44,7 @@ export function DiscussionThread({
   sessionId,
   isMember,
   totalChapters,
+  memberProgressMap = {},
 }: DiscussionThreadProps) {
   const { user } = useAuth();
   const supabase = createClient();
@@ -235,95 +239,123 @@ export function DiscussionThread({
   };
 
   return (
-    <Card className="p-6 sm:p-8 space-y-6 rounded-3xl">
+    <Card className="flex flex-col h-[750px] p-5 sm:p-6 rounded-3xl border-stone-200/90 dark:border-stone-800 shadow-sm bg-white/90 dark:bg-stone-900/90 backdrop-blur-md">
       {/* Thread Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-stone-100 dark:border-stone-800">
+      <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-stone-100 dark:border-stone-800 flex-shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="p-2.5 rounded-2xl bg-amber-100 dark:bg-stone-800 text-amber-700 dark:text-amber-400">
+          <div className="p-2 rounded-2xl bg-amber-100 dark:bg-stone-800 text-amber-700 dark:text-amber-400">
             <MessageSquare className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-serif text-lg font-bold text-stone-900 dark:text-stone-100">
+            <h3 className="font-serif text-base sm:text-lg font-bold text-stone-900 dark:text-stone-100 leading-tight">
               Session Discussion
             </h3>
-            <p className="text-xs text-stone-500">
-              Focused single thread for this book
+            <p className="text-[11px] text-stone-500">
+              Live thoughts & chapter reactions
             </p>
           </div>
         </div>
-        <Badge variant="outline" className="text-xs font-semibold">
-          {comments.length} {comments.length === 1 ? "comment" : "comments"}
+        <Badge variant="outline" className="text-xs font-semibold px-2 py-0.5">
+          {comments.length}
         </Badge>
       </div>
 
-      {/* Comment List */}
-      <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+      {/* Comment List (Scrollable Area) */}
+      <div className="flex-1 space-y-3.5 overflow-y-auto pr-1">
         {loading ? (
-          <div className="space-y-4 py-8">
+          <div className="space-y-3 py-6">
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="h-24 rounded-2xl bg-stone-100 dark:bg-stone-800 animate-pulse"
+                className="h-20 rounded-2xl bg-stone-100 dark:bg-stone-800 animate-pulse"
               />
             ))}
           </div>
         ) : comments.length > 0 ? (
           comments.map((comment) => {
             const isSpoilerHidden = comment.is_spoiler && !revealedSpoilers[comment.id];
+            const authorProgress = memberProgressMap[comment.user_id];
+            const authorPercent = authorProgress
+              ? Math.min(100, Math.round((authorProgress.current_chapter / totalChapters) * 100))
+              : 0;
 
             return (
               <div
                 key={comment.id}
-                className="group relative bg-[#FAF9F6] dark:bg-stone-800/50 rounded-2xl p-4 sm:p-5 border border-stone-200/60 dark:border-stone-800 space-y-3 transition-colors hover:border-amber-300/40"
+                className="group relative bg-[#FAF9F6] dark:bg-stone-800/50 rounded-2xl p-3.5 sm:p-4 border border-stone-200/70 dark:border-stone-800 space-y-2.5 transition-all hover:border-amber-300/50 shadow-2xs"
               >
-                {/* Author Info & Meta */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-linear-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-xs uppercase shadow-sm">
-                      {comment.author?.username?.charAt(0) || "U"}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-stone-900 dark:text-stone-100">
-                          {comment.author?.full_name || comment.author?.username || "Reader"}
-                        </span>
-                        <span className="text-[10px] text-amber-600 font-medium">
-                          @{comment.author?.username || "member"}
-                        </span>
+                {/* Author Info & Progress Bar Inline */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-full bg-linear-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-[10px] uppercase flex-shrink-0 shadow-xs">
+                        {comment.author?.username?.charAt(0) || "U"}
                       </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-stone-900 dark:text-stone-100 truncate">
+                            {comment.author?.full_name || comment.author?.username || "Reader"}
+                          </span>
+                          <span className="text-[10px] text-amber-600 font-medium">
+                            @{comment.author?.username || "member"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {comment.chapter_reference && (
+                        <Badge variant="secondary" className="gap-0.5 text-[10px] font-bold px-1.5 py-0">
+                          <Bookmark className="w-2.5 h-2.5 text-amber-600" />
+                          <span>Ch. {comment.chapter_reference}</span>
+                        </Badge>
+                      )}
                       <span className="text-[10px] text-stone-400">
                         {formatTimeAgo(comment.created_at)}
                       </span>
                     </div>
                   </div>
 
-                  {/* Chapter badge */}
-                  {comment.chapter_reference && (
-                    <Badge variant="secondary" className="gap-1 text-[11px] font-bold">
-                      <Bookmark className="w-3 h-3 text-amber-600" />
-                      <span>Chapter {comment.chapter_reference}</span>
-                    </Badge>
+                  {/* User Reading Progress Bar Inside Comment */}
+                  {authorProgress && (
+                    <div className="flex items-center gap-2 bg-white/70 dark:bg-stone-900/60 px-2 py-1 rounded-lg border border-stone-200/50 dark:border-stone-800">
+                      <span className="text-[10px] font-semibold text-stone-500 whitespace-nowrap">
+                        Reader Progress:
+                      </span>
+                      <div className="flex-1">
+                        <Progress value={authorPercent} className="h-1.5" />
+                      </div>
+                      <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 whitespace-nowrap flex items-center gap-1">
+                        {authorProgress.is_completed ? (
+                          <span className="text-emerald-600 flex items-center gap-0.5">
+                            <Trophy className="w-2.5 h-2.5" /> Finished
+                          </span>
+                        ) : (
+                          `Ch. ${authorProgress.current_chapter}/${totalChapters}`
+                        )}
+                      </span>
+                    </div>
                   )}
                 </div>
 
-                {/* Comment Content */}
-                <div className="relative">
+                {/* Comment Text Content */}
+                <div className="relative pt-0.5">
                   {comment.is_spoiler && (
-                    <div className="mb-2">
+                    <div className="mb-1.5">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => toggleSpoiler(comment.id)}
-                        className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 h-auto p-0 hover:bg-transparent"
+                        className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 h-auto p-0 hover:bg-transparent"
                       >
                         {isSpoilerHidden ? (
                           <>
-                            <Eye className="w-3.5 h-3.5 mr-1" />
+                            <Eye className="w-3 h-3 mr-1" />
                             <span>Contains spoiler (click to show)</span>
                           </>
                         ) : (
                           <>
-                            <EyeOff className="w-3.5 h-3.5 mr-1" />
+                            <EyeOff className="w-3 h-3 mr-1" />
                             <span>Hide spoiler</span>
                           </>
                         )}
@@ -332,7 +364,7 @@ export function DiscussionThread({
                   )}
 
                   <p
-                    className={`text-sm text-stone-800 dark:text-stone-200 leading-relaxed whitespace-pre-wrap ${
+                    className={`text-xs sm:text-sm text-stone-800 dark:text-stone-200 leading-relaxed whitespace-pre-wrap ${
                       isSpoilerHidden ? "filter blur-sm select-none" : ""
                     }`}
                   >
@@ -341,20 +373,20 @@ export function DiscussionThread({
                 </div>
 
                 {/* Reactions Toolbar */}
-                <div className="pt-2 flex flex-wrap items-center gap-1.5 border-t border-stone-200/50 dark:border-stone-800/80">
+                <div className="pt-1.5 flex flex-wrap items-center gap-1 border-t border-stone-200/50 dark:border-stone-800/80">
                   {comment.reactions.map(({ emoji, count, hasReacted }) => (
                     <button
                       key={emoji}
                       onClick={() => handleToggleReaction(comment.id, emoji)}
                       disabled={!isMember}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-all ${
                         hasReacted
-                          ? "bg-amber-100/90 border-amber-300 text-amber-900 dark:bg-amber-950/80 dark:border-amber-700 dark:text-amber-200 scale-105 shadow-sm"
+                          ? "bg-amber-100/90 border-amber-300 text-amber-900 dark:bg-amber-950/80 dark:border-amber-700 dark:text-amber-200 scale-105 shadow-xs"
                           : "bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
                       } ${!isMember ? "opacity-60 cursor-not-allowed" : "active:scale-95"}`}
                     >
                       <span>{emoji}</span>
-                      {count > 0 && <span className="text-[11px] font-bold">{count}</span>}
+                      {count > 0 && <span className="text-[10px] font-bold">{count}</span>}
                     </button>
                   ))}
                 </div>
@@ -363,8 +395,8 @@ export function DiscussionThread({
           })
         ) : (
           <div className="text-center py-12 px-4 border border-dashed border-stone-200 dark:border-stone-800 rounded-2xl">
-            <p className="text-sm text-stone-500">
-              No comments yet in this session. Be the first to start the conversation!
+            <p className="text-xs text-stone-500">
+              No comments yet in this session. Start the conversation below!
             </p>
           </div>
         )}
@@ -372,77 +404,69 @@ export function DiscussionThread({
       </div>
 
       {/* Composer Section */}
-      <div className="pt-4 border-t border-stone-100 dark:border-stone-800">
+      <div className="pt-3 border-t border-stone-100 dark:border-stone-800 flex-shrink-0">
         {!user ? (
-          <Card className="p-4 bg-amber-50/60 dark:bg-stone-800/60 border-amber-200/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-            <div>
-              <p className="text-xs font-bold text-stone-900 dark:text-stone-100">
-                Want to join the discussion?
-              </p>
-              <p className="text-xs text-stone-500">
-                Sign in to post comments and react with other readers.
-              </p>
-            </div>
+          <Card className="p-3 bg-amber-50/60 dark:bg-stone-800/60 border-amber-200/60 flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-stone-700 dark:text-stone-300">
+              Sign in to post comments & react
+            </p>
             <Link href="/auth/login">
-              <Button size="sm" className="gap-1.5">
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Sign In</span>
+              <Button size="sm" className="h-7 text-xs px-2.5">
+                <LogIn className="w-3 h-3 mr-1" />
+                Sign In
               </Button>
             </Link>
           </Card>
         ) : !isMember ? (
-          <Card className="p-4 bg-amber-50/80 dark:bg-stone-800/60 border-amber-200 dark:border-stone-700 text-center space-y-1">
+          <Card className="p-3 bg-amber-50/80 dark:bg-stone-800/60 border-amber-200 text-center">
             <p className="text-xs font-bold text-amber-900 dark:text-amber-300">
-              Join this reading session to join the discussion
-            </p>
-            <p className="text-xs text-stone-500">
-              Click &quot;Join Reading Session&quot; above to post thoughts and react to comments.
+              Join this session to post comments & discuss
             </p>
           </Card>
         ) : (
-          <form onSubmit={handlePostComment} className="space-y-3">
+          <form onSubmit={handlePostComment} className="space-y-2.5">
             {error && (
-              <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <div className="p-2 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>{error}</span>
               </div>
             )}
 
             <Textarea
-              rows={3}
+              rows={2}
               required
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Share your thoughts, reactions, or chapter questions..."
-              className="resize-none"
+              placeholder="Share thoughts, quotes, or questions..."
+              className="resize-none text-xs sm:text-sm py-2 px-3 rounded-xl min-h-[60px]"
             />
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5 text-xs text-stone-600 dark:text-stone-400">
-                  <Bookmark className="w-3.5 h-3.5 text-amber-600" />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 text-[11px] text-stone-600 dark:text-stone-400">
+                  <Bookmark className="w-3 h-3 text-amber-600" />
                   <select
                     value={chapterRef}
                     onChange={(e) => setChapterRef(e.target.value)}
-                    className="px-2.5 py-1.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs text-stone-700 dark:text-stone-300 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="px-2 py-1 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-[11px] text-stone-700 dark:text-stone-300 focus:outline-none"
                   >
                     <option value="">General</option>
                     {Array.from({ length: totalChapters }, (_, i) => i + 1).map((ch) => (
                       <option key={ch} value={ch}>
-                        Chapter {ch}
+                        Ch. {ch}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <label className="flex items-center gap-1.5 text-xs text-stone-600 dark:text-stone-400 cursor-pointer select-none">
+                <label className="flex items-center gap-1 text-[11px] text-stone-600 dark:text-stone-400 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={isSpoiler}
                     onChange={(e) => setIsSpoiler(e.target.checked)}
-                    className="rounded text-amber-600 focus:ring-amber-500 h-4 w-4"
+                    className="rounded text-amber-600 focus:ring-amber-500 h-3.5 w-3.5"
                   />
-                  <span>Contains spoiler</span>
+                  <span>Spoiler</span>
                 </label>
               </div>
 
@@ -450,9 +474,9 @@ export function DiscussionThread({
                 type="submit"
                 size="sm"
                 disabled={submitting || !newComment.trim()}
-                className="gap-1.5"
+                className="h-8 px-3 text-xs gap-1 shadow-sm"
               >
-                <Send className="w-3.5 h-3.5" />
+                <Send className="w-3 h-3" />
                 <span>{submitting ? "Posting..." : "Post"}</span>
               </Button>
             </div>

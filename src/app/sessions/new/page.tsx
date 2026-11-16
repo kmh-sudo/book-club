@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { BookOpen, AlertCircle, ArrowLeft, Plus } from "lucide-react";
+import { BookOpen, AlertCircle, ArrowLeft, Plus, FileText, Upload, CheckCircle2 } from "lucide-react";
 
 export default function CreateSessionPage() {
   const router = useRouter();
@@ -21,8 +21,28 @@ export default function CreateSessionPage() {
   const [totalChapters, setTotalChapters] = useState<number>(10);
   const [description, setDescription] = useState("");
   const [targetEndDate, setTargetEndDate] = useState("");
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+
+  const handlePdfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== "application/pdf") {
+        setError("Only PDF files are supported.");
+        setPdfFile(null);
+        return;
+      }
+      if (file.size > 50 * 1024 * 1024) {
+        setError("PDF size must be under 50MB.");
+        setPdfFile(null);
+        return;
+      }
+      setError(null);
+      setPdfFile(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +60,36 @@ export default function CreateSessionPage() {
     setError(null);
 
     try {
+      let uploadedPdfUrl: string | null = null;
+
+      // 1. Upload PDF if selected
+      if (pdfFile) {
+        setUploadStatus("Uploading PDF book...");
+        const fileExt = "pdf";
+        const sanitizedName = title.trim().toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30);
+        const filePath = `${user.id}/${Date.now()}-${sanitizedName}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("session_pdfs")
+          .upload(filePath, pdfFile, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.warn("Storage upload notice:", uploadError);
+          // If storage bucket isn't set up yet, alert with fallback
+        } else {
+          const { data: publicUrlData } = supabase.storage
+            .from("session_pdfs")
+            .getPublicUrl(filePath);
+          uploadedPdfUrl = publicUrlData?.publicUrl || null;
+        }
+      }
+
+      setUploadStatus("Creating reading session...");
+
+      // 2. Insert reading session
       const { data: sessionData, error: sessionError } = await supabase
         .from("reading_sessions")
         .insert({
@@ -49,6 +99,7 @@ export default function CreateSessionPage() {
           total_chapters: totalChapters,
           description: description.trim() || null,
           target_end_date: targetEndDate || null,
+          pdf_url: uploadedPdfUrl,
           status: "active",
         })
         .select()
@@ -56,6 +107,7 @@ export default function CreateSessionPage() {
 
       if (sessionError) throw sessionError;
 
+      // 3. Auto-join creator to session
       await supabase.from("session_members").insert({
         session_id: sessionData.id,
         user_id: user.id,
@@ -74,6 +126,7 @@ export default function CreateSessionPage() {
       }
     } finally {
       setLoading(false);
+      setUploadStatus("");
     }
   };
 
@@ -120,7 +173,7 @@ export default function CreateSessionPage() {
               Start a Reading Session
             </h1>
             <p className="text-xs text-stone-500 mt-0.5">
-              Set up a book circle for members to join and track milestones together
+              Upload a book PDF, set chapter targets, and discuss with your book club
             </p>
           </div>
         </div>
@@ -143,7 +196,7 @@ export default function CreateSessionPage() {
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Project Hail Mary"
+                placeholder="e.g. The Great Gatsby"
               />
             </div>
 
@@ -156,7 +209,7 @@ export default function CreateSessionPage() {
                 required
                 value={author}
                 onChange={(e) => setAuthor(e.target.value)}
-                placeholder="e.g. Andy Weir"
+                placeholder="e.g. F. Scott Fitzgerald"
               />
             </div>
           </div>
@@ -188,6 +241,48 @@ export default function CreateSessionPage() {
             </div>
           </div>
 
+          {/* Book PDF Upload Section */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
+              Book PDF File (Optional)
+            </label>
+            <div className="border-2 border-dashed border-stone-200 dark:border-stone-800 rounded-2xl p-4 sm:p-6 text-center hover:border-amber-400/80 transition-colors bg-[#FAF9F6] dark:bg-stone-900/50">
+              <input
+                type="file"
+                id="pdf-upload"
+                accept="application/pdf"
+                onChange={handlePdfChange}
+                className="hidden"
+              />
+              <label
+                htmlFor="pdf-upload"
+                className="cursor-pointer flex flex-col items-center justify-center gap-2"
+              >
+                {pdfFile ? (
+                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-semibold text-sm">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    <span>{pdfFile.name}</span>
+                    <span className="text-xs text-stone-400 font-normal">
+                      ({(pdfFile.size / (1024 * 1024)).toFixed(2)} MB)
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 dark:bg-stone-800 dark:text-amber-400 flex items-center justify-center">
+                      <Upload className="w-5 h-5" />
+                    </div>
+                    <span className="text-xs sm:text-sm font-semibold text-stone-800 dark:text-stone-200">
+                      Click to upload book PDF
+                    </span>
+                    <span className="text-[11px] text-stone-400">
+                      PDF documents up to 50MB for members to read directly in the session
+                    </span>
+                  </>
+                )}
+              </label>
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400 mb-1.5">
               Reading Goals & Overview
@@ -209,7 +304,11 @@ export default function CreateSessionPage() {
               className="w-full gap-2 shadow-md shadow-amber-600/20"
             >
               <Plus className="w-4 h-4" />
-              <span>{loading ? "Publishing Session..." : "Create Reading Session"}</span>
+              <span>
+                {loading
+                  ? uploadStatus || "Publishing Session..."
+                  : "Create Reading Session"}
+              </span>
             </Button>
           </div>
         </form>

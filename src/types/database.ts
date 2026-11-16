@@ -47,6 +47,7 @@ export interface Database {
           total_chapters: number;
           description: string | null;
           cover_image_url: string | null;
+          pdf_url: string | null;
           status: "active" | "completed" | "archived";
           start_date: string;
           target_end_date: string | null;
@@ -61,6 +62,7 @@ export interface Database {
           total_chapters: number;
           description?: string | null;
           cover_image_url?: string | null;
+          pdf_url?: string | null;
           status?: "active" | "completed" | "archived";
           start_date?: string;
           target_end_date?: string | null;
@@ -75,6 +77,7 @@ export interface Database {
           total_chapters?: number;
           description?: string | null;
           cover_image_url?: string | null;
+          pdf_url?: string | null;
           status?: "active" | "completed" | "archived";
           start_date?: string;
           target_end_date?: string | null;

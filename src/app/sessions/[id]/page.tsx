@@ -8,18 +8,20 @@ import { useAuth } from "@/context/AuthContext";
 import { ReadingSession, SessionMember, Profile } from "@/types/database";
 import { ProgressUpdater } from "@/components/ProgressUpdater";
 import { DiscussionThread } from "@/components/DiscussionThread";
+import { PdfViewer } from "@/components/PdfViewer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import {
   BookOpen,
   Calendar,
-  Users,
   ArrowLeft,
   UserPlus,
   LogOut,
-  Trophy,
+  FileText,
+  Upload,
+  CheckCircle2,
+  Users,
 } from "lucide-react";
 
 interface MemberWithProfile extends SessionMember {
@@ -42,6 +44,8 @@ export default function SessionDetailPage({
   const [userMembership, setUserMembership] = useState<SessionMember | null>(null);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const loadSessionDetails = async () => {
     try {
@@ -147,9 +151,62 @@ export default function SessionDetailPage({
     }
   };
 
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !session || user.id !== session.creator_id) return;
+
+    if (file.type !== "application/pdf") {
+      setUploadError("Only PDF files are allowed.");
+      return;
+    }
+
+    setUploadingPdf(true);
+    setUploadError(null);
+
+    try {
+      const fileExt = "pdf";
+      const sanitizedName = session.title.trim().toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30);
+      const filePath = `${user.id}/${Date.now()}-${sanitizedName}.${fileExt}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from("session_pdfs")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadErr) throw uploadErr;
+
+      const { data: publicUrlData } = supabase.storage
+        .from("session_pdfs")
+        .getPublicUrl(filePath);
+
+      const publicUrl = publicUrlData?.publicUrl;
+
+      // Update session record
+      const { error: updateErr } = await supabase
+        .from("reading_sessions")
+        .update({ pdf_url: publicUrl })
+        .eq("id", session.id);
+
+      if (updateErr) throw updateErr;
+
+      await loadSessionDetails();
+    } catch (err: unknown) {
+      console.error(err);
+      if (err instanceof Error) {
+        setUploadError(err.message);
+      } else {
+        setUploadError("Failed to upload PDF. Please ensure session_pdfs storage bucket is created.");
+      }
+    } finally {
+      setUploadingPdf(false);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-16 text-center space-y-3">
+      <div className="max-w-6xl mx-auto px-4 py-16 text-center space-y-3">
         <div className="w-8 h-8 border-2 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto" />
         <p className="text-sm text-stone-500 font-medium">Loading reading session...</p>
       </div>
@@ -170,30 +227,110 @@ export default function SessionDetailPage({
     );
   }
 
-  return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 md:py-10 space-y-8">
-      {/* Back navigation */}
-      <Link href="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors">
-        <ArrowLeft className="w-3.5 h-3.5" />
-        Back to all sessions
-      </Link>
+  const isCreator = user && user.id === session.creator_id;
 
-      {/* Main Book Card */}
-      <Card className="p-6 sm:p-8 space-y-6 rounded-3xl shadow-sm border-stone-200/90 dark:border-stone-800">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pb-6 border-b border-stone-100 dark:border-stone-800">
+  // Build a fast lookup map of user progress for comments
+  const memberProgressMap: Record<string, { current_chapter: number; is_completed: boolean }> = {};
+  members.forEach((m) => {
+    memberProgressMap[m.user_id] = {
+      current_chapter: m.current_chapter,
+      is_completed: m.is_completed,
+    };
+  });
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 md:py-8 space-y-6">
+      {/* Top Header Row with Navigation & Actions */}
+      <div className="flex items-center justify-between">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Back to all sessions
+        </Link>
+
+        <div className="flex items-center gap-2">
+          {/* Creator PDF Upload Option if not uploaded yet */}
+          {isCreator && !session.pdf_url && (
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={handlePdfUpload}
+                disabled={uploadingPdf}
+                className="hidden"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                asChild
+                disabled={uploadingPdf}
+                className="gap-1.5 text-xs rounded-xl shadow-xs"
+              >
+                <span>
+                  <Upload className="w-3.5 h-3.5 text-amber-600" />
+                  {uploadingPdf ? "Uploading PDF..." : "Upload Book PDF"}
+                </span>
+              </Button>
+            </label>
+          )}
+
+          {!userMembership ? (
+            <Button
+              onClick={handleJoinSession}
+              disabled={joining}
+              size="sm"
+              className="gap-1.5 text-xs rounded-xl shadow-sm"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>{joining ? "Joining..." : "Join Session"}</span>
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLeaveSession}
+              className="text-stone-400 hover:text-red-600 hover:bg-red-50 text-xs rounded-xl"
+            >
+              <LogOut className="w-3.5 h-3.5 mr-1" />
+              <span>Leave</span>
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {uploadError && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl">
+          {uploadError}
+        </div>
+      )}
+
+      {/* Book Session Header Banner */}
+      <Card className="p-5 sm:p-7 space-y-4 rounded-3xl shadow-sm border-stone-200/90 dark:border-stone-800 bg-white/90 dark:bg-stone-900/90 backdrop-blur-md">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
           <div className="flex items-start gap-4">
-            <div className="w-20 h-28 rounded-2xl bg-linear-to-br from-amber-200 via-amber-300 to-amber-500 dark:from-stone-800 dark:to-stone-700 flex flex-col items-center justify-center p-3 text-center shadow-md flex-shrink-0">
-              <BookOpen className="w-8 h-8 text-amber-950 dark:text-amber-200 mb-1" />
-              <span className="text-[11px] font-extrabold text-amber-950 dark:text-amber-100 uppercase tracking-tighter">
+            <div className="w-16 h-22 sm:w-20 sm:h-28 rounded-2xl bg-linear-to-br from-amber-200 via-amber-300 to-amber-500 dark:from-stone-800 dark:to-stone-700 flex flex-col items-center justify-center p-2.5 text-center shadow-md flex-shrink-0">
+              <BookOpen className="w-7 h-7 sm:w-8 sm:h-8 text-amber-950 dark:text-amber-200 mb-1" />
+              <span className="text-[10px] sm:text-[11px] font-extrabold text-amber-950 dark:text-amber-100 uppercase tracking-tighter">
                 {session.total_chapters} Chs
               </span>
             </div>
 
             <div>
-              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <Badge variant={session.status === "active" ? "success" : "secondary"} className="uppercase font-bold text-[10px]">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <Badge
+                  variant={session.status === "active" ? "success" : "secondary"}
+                  className="uppercase font-bold text-[10px]"
+                >
                   {session.status}
                 </Badge>
+                {session.pdf_url && (
+                  <Badge variant="secondary" className="gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 dark:bg-amber-950/70 dark:text-amber-300">
+                    <FileText className="w-3 h-3 text-amber-600" />
+                    PDF Book Attached
+                  </Badge>
+                )}
                 {session.target_end_date && (
                   <span className="flex items-center gap-1 text-[11px] font-semibold text-stone-500">
                     <Calendar className="w-3 h-3" />
@@ -202,148 +339,108 @@ export default function SessionDetailPage({
                 )}
               </div>
 
-              <h1 className="font-serif text-2xl sm:text-3xl font-extrabold text-stone-900 dark:text-stone-100">
+              <h1 className="font-serif text-xl sm:text-2xl md:text-3xl font-extrabold text-stone-900 dark:text-stone-100">
                 {session.title}
               </h1>
-              <p className="text-sm font-semibold text-stone-600 dark:text-stone-400 mt-0.5">
+              <p className="text-xs sm:text-sm font-semibold text-stone-600 dark:text-stone-400 mt-0.5">
                 by {session.author}
               </p>
 
-              <div className="flex items-center gap-2 mt-3 text-xs text-stone-500">
+              <div className="flex items-center gap-2 mt-2 text-xs text-stone-500">
                 <span>Hosted by</span>
                 <span className="font-bold text-stone-800 dark:text-stone-200">
                   {host?.full_name || host?.username || "Host"}
+                </span>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <Users className="w-3 h-3 text-amber-600" />
+                  {members.length} {members.length === 1 ? "member" : "members"}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Join / Leave Controls */}
-          <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            {!userMembership ? (
-              <Button
-                onClick={handleJoinSession}
-                disabled={joining}
-                size="lg"
-                className="gap-2 shadow-md shadow-amber-600/20"
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>{joining ? "Joining..." : "Join Reading Session"}</span>
-              </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleLeaveSession}
-                className="text-stone-400 hover:text-red-600 hover:bg-red-50 text-xs"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Leave Session</span>
-              </Button>
-            )}
-          </div>
+          {/* User's Progress Bar Widget */}
+          {userMembership && user && (
+            <div className="w-full md:w-80 flex-shrink-0">
+              <ProgressUpdater
+                sessionId={session.id}
+                userId={user.id}
+                totalChapters={session.total_chapters}
+                initialChapter={userMembership.current_chapter}
+                isCompleted={userMembership.is_completed}
+                onUpdate={(newCh, completed) => {
+                  setUserMembership((prev) =>
+                    prev ? { ...prev, current_chapter: newCh, is_completed: completed } : null
+                  );
+                }}
+              />
+            </div>
+          )}
         </div>
 
-        {/* Description / Reading notes */}
         {session.description && (
-          <div className="space-y-1.5">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-stone-400">
-              Session Overview & Goals
-            </h4>
-            <p className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed whitespace-pre-wrap">
-              {session.description}
-            </p>
-          </div>
-        )}
-
-        {/* Member Reading Progress Component */}
-        {userMembership && user && (
-          <div className="pt-2">
-            <ProgressUpdater
-              sessionId={session.id}
-              userId={user.id}
-              totalChapters={session.total_chapters}
-              initialChapter={userMembership.current_chapter}
-              isCompleted={userMembership.is_completed}
-              onUpdate={(newCh, completed) => {
-                setUserMembership((prev) =>
-                  prev ? { ...prev, current_chapter: newCh, is_completed: completed } : null
-                );
-              }}
-            />
-          </div>
+          <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-300 leading-relaxed pt-2 border-t border-stone-100 dark:border-stone-800">
+            {session.description}
+          </p>
         )}
       </Card>
 
-      {/* Grid: Reading Roster & Discussion */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Readers Roster (1 Column) */}
-        <div className="lg:col-span-1 space-y-4">
-          <Card className="p-5 sm:p-6 space-y-4 rounded-3xl">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100 dark:border-stone-800">
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-amber-600" />
-                <h3 className="font-serif text-base font-bold text-stone-900 dark:text-stone-100">
-                  Readers Roster
-                </h3>
+      {/* Main Content Layout: Side-by-Side on Desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column: Interactive PDF Viewer */}
+        <div className="lg:col-span-7 xl:col-span-8 order-2 lg:order-1">
+          {session.pdf_url ? (
+            <PdfViewer pdfUrl={session.pdf_url} bookTitle={session.title} />
+          ) : (
+            <Card className="p-8 sm:p-12 text-center rounded-3xl border-dashed space-y-4 bg-white/70 dark:bg-stone-900/70 h-[450px] flex flex-col items-center justify-center">
+              <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-700 dark:bg-stone-800 dark:text-amber-400 flex items-center justify-center shadow-xs">
+                <FileText className="w-7 h-7" />
               </div>
-              <Badge variant="outline" className="text-xs font-bold">
-                {members.length} {members.length === 1 ? "Reader" : "Readers"}
-              </Badge>
-            </div>
+              <div className="max-w-md space-y-1">
+                <h3 className="font-serif text-lg font-bold text-stone-900 dark:text-stone-100">
+                  No PDF Book Uploaded Yet
+                </h3>
+                <p className="text-xs sm:text-sm text-stone-500 leading-relaxed">
+                  {isCreator
+                    ? "As the creator of this session, you can upload the PDF book so members can read it directly here alongside discussions."
+                    : "The host hasn't uploaded a PDF copy for this session yet. You can still track chapters and participate in the discussion!"}
+                </p>
+              </div>
 
-            <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
-              {members.map((mem) => {
-                const percent = Math.min(
-                  100,
-                  Math.round((mem.current_chapter / session.total_chapters) * 100)
-                );
-                const isMe = user && mem.user_id === user.id;
-
-                return (
-                  <div
-                    key={mem.id}
-                    className={`p-3.5 rounded-2xl border transition-all ${
-                      isMe
-                        ? "bg-amber-50/70 dark:bg-stone-800 border-amber-200 dark:border-stone-700 shadow-sm"
-                        : "bg-[#FAF8F5]/80 dark:bg-stone-800/40 border-stone-200/50 dark:border-stone-800"
-                    }`}
+              {isCreator && (
+                <label className="cursor-pointer pt-2">
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handlePdfUpload}
+                    disabled={uploadingPdf}
+                    className="hidden"
+                  />
+                  <Button
+                    size="sm"
+                    asChild
+                    disabled={uploadingPdf}
+                    className="gap-2 rounded-xl shadow-md shadow-amber-600/20"
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-6 h-6 rounded-full bg-linear-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-[10px] uppercase flex-shrink-0 shadow-sm">
-                          {mem.profile?.username?.charAt(0) || "R"}
-                        </div>
-                        <span className="text-xs font-bold truncate text-stone-900 dark:text-stone-100">
-                          {mem.profile?.full_name || mem.profile?.username || "Reader"}
-                          {isMe && " (You)"}
-                        </span>
-                      </div>
-                      {mem.is_completed ? (
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                          <Trophy className="w-3 h-3" /> Done
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-bold text-stone-500">
-                          Ch. {mem.current_chapter}/{session.total_chapters}
-                        </span>
-                      )}
-                    </div>
-
-                    <Progress value={percent} className="h-1.5" />
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
+                    <span>
+                      <Upload className="w-4 h-4" />
+                      {uploadingPdf ? "Uploading..." : "Upload Session PDF"}
+                    </span>
+                  </Button>
+                </label>
+              )}
+            </Card>
+          )}
         </div>
 
-        {/* Single-Thread Discussion Feed (2 Columns) */}
-        <div className="lg:col-span-2">
+        {/* Right Column: Session Discussion Sidebar with Inline Reader Progress */}
+        <div className="lg:col-span-5 xl:col-span-4 order-1 lg:order-2">
           <DiscussionThread
             sessionId={session.id}
             isMember={!!userMembership}
             totalChapters={session.total_chapters}
+            memberProgressMap={memberProgressMap}
           />
         </div>
       </div>
