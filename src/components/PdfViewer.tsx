@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { MobilePdfReader } from "@/components/MobilePdfReader";
 import { Button } from "@/components/ui/button";
 import {
   FileText,
@@ -17,8 +18,21 @@ interface PdfViewerProps {
   bookTitle: string;
 }
 
+const DESKTOP_QUERY = "(min-width: 1024px)";
+
 export function PdfViewer({ pdfUrl, bookTitle }: PdfViewerProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Default to the desktop viewer so server-rendered markup and large screens
+  // are unchanged; small screens switch to the in-app reader after hydration.
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  useEffect(() => {
+    const media = window.matchMedia(DESKTOP_QUERY);
+    setIsDesktop(media.matches);
+    const onChange = (event: MediaQueryListEvent) => setIsDesktop(event.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
 
   return (
     <Card
@@ -72,13 +86,18 @@ export function PdfViewer({ pdfUrl, bookTitle }: PdfViewerProps) {
         </div>
       </div>
 
-      {/* Embedded PDF iframe */}
-      <div className="flex-1 w-full bg-stone-100 dark:bg-stone-950 relative">
-        <iframe
-          src={`${pdfUrl}#toolbar=1&navpanes=0`}
-          className="w-full h-full border-0"
-          title={`PDF for ${bookTitle}`}
-        />
+      {/* Desktop: native viewer. Mobile: pages rendered in-app, because mobile
+          browsers do not provide a scrollable PDF viewport inside an iframe. */}
+      <div className="flex-1 min-h-0 w-full bg-stone-100 dark:bg-stone-950 relative">
+        {isDesktop ? (
+          <iframe
+            src={`${pdfUrl}#toolbar=1&navpanes=0`}
+            className="w-full h-full border-0"
+            title={`PDF for ${bookTitle}`}
+          />
+        ) : (
+          <MobilePdfReader pdfUrl={pdfUrl} bookTitle={bookTitle} />
+        )}
       </div>
     </Card>
   );
