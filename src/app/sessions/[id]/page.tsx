@@ -601,6 +601,7 @@ export default function SessionDetailPage({
         <div className="lg:col-span-5 xl:col-span-4 order-1 lg:order-2">
           <DiscussionThread
             sessionId={session.id}
+            sessionCreatorId={session.creator_id}
             isMember={!!userMembership}
             totalChapters={session.total_chapters}
             memberProgressMap={memberProgressMap}
