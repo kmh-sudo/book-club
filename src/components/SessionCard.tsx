@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { BookOpen, Users, Sparkles, CheckCircle2, FileText } from "lucide-react";
 import { ReadingSession, Profile } from "@/types/database";
+import { BookCover } from "@/components/BookCover";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -42,13 +43,17 @@ export function SessionCard({ session }: SessionCardProps) {
         )}
 
         <div className="flex items-start gap-4">
-          {/* Book Cover Mockup */}
-          <div className="w-14 h-20 rounded-xl bg-linear-to-br from-amber-100 via-amber-200 to-amber-300 dark:from-stone-800 dark:via-stone-700 dark:to-stone-700 flex flex-col items-center justify-center p-2 text-center shadow-sm border border-amber-200/40 dark:border-stone-700 flex-shrink-0 group-hover:scale-105 group-hover:rotate-1 transition-all duration-300">
+          {/* Book Cover */}
+          <BookCover
+            url={session.cover_image_url}
+            alt={`${session.title} cover`}
+            className="w-14 h-20 rounded-xl bg-linear-to-br from-amber-100 via-amber-200 to-amber-300 dark:from-stone-800 dark:via-stone-700 dark:to-stone-700 flex flex-col items-center justify-center p-2 text-center shadow-sm border border-amber-200/40 dark:border-stone-700 flex-shrink-0 group-hover:scale-105 group-hover:rotate-1 transition-all duration-300"
+          >
             <BookOpen className="w-5 h-5 text-amber-800 dark:text-amber-400 mb-1" />
             <span className="text-[9px] font-extrabold text-amber-950 dark:text-amber-200 uppercase tracking-tight">
               {session.total_chapters} Ch
             </span>
-          </div>
+          </BookCover>
 
           {/* Info */}
           <div className="flex-1 min-w-0 pr-6">

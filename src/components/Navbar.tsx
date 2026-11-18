@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
-  BookOpen,
   PlusCircle,
   Compass,
   LogIn,
@@ -23,9 +22,15 @@ export function Navbar() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-10 h-10 rounded-2xl bg-linear-to-tr from-amber-600 to-amber-500 flex items-center justify-center text-white shadow-md shadow-amber-600/25 group-hover:scale-105 group-hover:rotate-[-2deg] transition-all duration-300">
-            <BookOpen className="w-5 h-5" />
-          </div>
+          <img
+            src="/bclogo-icon.png"
+            alt=""
+            width={40}
+            height={40}
+            loading="eager"
+            decoding="async"
+            className="w-10 h-10 rounded-2xl object-cover shadow-md shadow-amber-600/25 group-hover:scale-105 group-hover:rotate-[-2deg] transition-all duration-300"
+          />
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-serif text-xl font-bold tracking-tight text-stone-900 dark:text-stone-100">

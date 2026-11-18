@@ -9,6 +9,7 @@ import { ReadingSession, SessionMember, Profile } from "@/types/database";
 import { ProgressUpdater } from "@/components/ProgressUpdater";
 import { DiscussionThread } from "@/components/DiscussionThread";
 import { PdfViewer } from "@/components/PdfViewer";
+import { BookCover } from "@/components/BookCover";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -22,6 +23,8 @@ import {
   Upload,
   Users,
   Crown,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 interface MemberWithProfile extends SessionMember {
@@ -46,6 +49,8 @@ export default function SessionDetailPage({
   const [joining, setJoining] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const loadSessionDetails = async () => {
     try {
@@ -144,6 +149,63 @@ export default function SessionDetailPage({
       } catch (err) {
         console.error("Error leaving session:", err);
       }
+    }
+  };
+
+  const storagePathFromUrl = (url: string | null, bucket: string) => {
+    if (!url) return null;
+    const marker = `/object/public/${bucket}/`;
+    const index = url.indexOf(marker);
+    if (index === -1) return null;
+    return decodeURIComponent(url.slice(index + marker.length).split("?")[0]);
+  };
+
+  const handleDeleteSession = async () => {
+    if (!session || !user || user.id !== session.creator_id || deleting) return;
+
+    if (
+      !confirm(
+        `Delete "${session.title}"? Its discussion thread and member progress will be removed. This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setDeleting(true);
+    setActionError(null);
+
+    try {
+      const { error: deleteError } = await supabase
+        .from("reading_sessions")
+        .delete()
+        .eq("id", session.id);
+
+      if (deleteError) throw deleteError;
+
+      // Best effort: drop this session's uploaded files, ignoring storage failures.
+      const files = [
+        { bucket: "session_pdfs", path: storagePathFromUrl(session.pdf_url, "session_pdfs") },
+        {
+          bucket: "book-cover-image",
+          path: storagePathFromUrl(session.cover_image_url, "book-cover-image"),
+        },
+      ].filter((file): file is { bucket: string; path: string } => Boolean(file.path));
+
+      if (files.length > 0) {
+        await Promise.allSettled(
+          files.map((file) => supabase.storage.from(file.bucket).remove([file.path]))
+        );
+      }
+
+      router.push("/");
+      router.refresh();
+    } catch (err: unknown) {
+      console.error("Error deleting session:", err);
+      setActionError(
+        err instanceof Error ? err.message : "Failed to delete the session. Please try again."
+      );
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -262,7 +324,32 @@ export default function SessionDetailPage({
           Back to sessions
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {isCreator && (
+            <>
+              <Link href={`/sessions/${session.id}/edit`}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs rounded-xl"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-amber-600" />
+                  Edit
+                </Button>
+              </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDeleteSession}
+                disabled={deleting}
+                className="gap-1.5 text-xs rounded-xl text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {deleting ? "Deleting…" : "Delete"}
+              </Button>
+            </>
+          )}
+
           {/* Creator PDF Upload if no PDF yet */}
           {isCreator && !session.pdf_url && (
             <label className="cursor-pointer">
@@ -314,6 +401,13 @@ export default function SessionDetailPage({
         </div>
       </div>
 
+      {/* Session Action Error */}
+      {actionError && (
+        <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-300 text-xs rounded-xl leading-relaxed">
+          ⚠️ {actionError}
+        </div>
+      )}
+
       {/* Upload Error */}
       {uploadError && (
         <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-300 text-xs rounded-xl leading-relaxed">
@@ -327,14 +421,18 @@ export default function SessionDetailPage({
         <div className="absolute top-0 inset-x-0 h-1 bg-linear-to-r from-amber-400 via-amber-500 to-rose-400" />
 
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 pt-1">
-          {/* Book cover mockup + info */}
+          {/* Book cover + info */}
           <div className="flex items-start gap-4">
-            <div className="w-16 h-24 sm:w-20 sm:h-28 rounded-2xl bg-linear-to-br from-amber-200 via-amber-300 to-amber-500 dark:from-stone-700 dark:to-stone-600 flex flex-col items-center justify-center p-2.5 text-center shadow-md flex-shrink-0">
+            <BookCover
+              url={session.cover_image_url}
+              alt={`${session.title} cover`}
+              className="w-16 h-24 sm:w-20 sm:h-28 rounded-2xl bg-linear-to-br from-amber-200 via-amber-300 to-amber-500 dark:from-stone-700 dark:to-stone-600 flex flex-col items-center justify-center p-2.5 text-center shadow-md flex-shrink-0"
+            >
               <BookOpen className="w-7 h-7 sm:w-8 sm:h-8 text-amber-950 dark:text-amber-200 mb-1" />
               <span className="text-[10px] sm:text-[11px] font-extrabold text-amber-950 dark:text-amber-100 uppercase tracking-tighter leading-tight">
                 {session.total_chapters} Chs
               </span>
-            </div>
+            </BookCover>
 
             <div className="min-w-0">
               {/* Status + PDF badge */}

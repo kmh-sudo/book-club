@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { BookOpen, AlertCircle, ArrowLeft, Plus, FileText, Upload, CheckCircle2 } from "lucide-react";
+import { BookOpen, AlertCircle, ArrowLeft, Plus, Upload, CheckCircle2, ImagePlus } from "lucide-react";
 
 export default function CreateSessionPage() {
   const router = useRouter();
@@ -22,6 +22,8 @@ export default function CreateSessionPage() {
   const [description, setDescription] = useState("");
   const [targetEndDate, setTargetEndDate] = useState("");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +46,44 @@ export default function CreateSessionPage() {
     }
   };
 
+  const coverPreviewRef = useRef<string | null>(null);
+
+  // Set the picked cover and swap its local preview, revoking the previous object URL.
+  const applyCoverFile = (file: File | null, input?: HTMLInputElement) => {
+    if (coverPreviewRef.current) URL.revokeObjectURL(coverPreviewRef.current);
+    coverPreviewRef.current = file ? URL.createObjectURL(file) : null;
+    setCoverFile(file);
+    setCoverPreview(coverPreviewRef.current);
+    if (!file && input) input.value = "";
+  };
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setError("Cover image must be a JPG, PNG or WebP file.");
+      applyCoverFile(null, e.target);
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Cover image must be under 5MB.");
+      applyCoverFile(null, e.target);
+      return;
+    }
+
+    setError(null);
+    applyCoverFile(file);
+  };
+
+  // Release the last preview object URL when the form unmounts.
+  useEffect(() => {
+    return () => {
+      if (coverPreviewRef.current) URL.revokeObjectURL(coverPreviewRef.current);
+    };
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
@@ -61,12 +101,53 @@ export default function CreateSessionPage() {
 
     try {
       let uploadedPdfUrl: string | null = null;
+      let uploadedCoverUrl: string | null = null;
+      const sanitizedName = title.trim().toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30);
 
-      // 1. Upload PDF if selected
+      // 1. Upload cover image if selected
+      if (coverFile) {
+        setUploadStatus("Uploading cover image...");
+        const coverExt =
+          coverFile.type === "image/png" ? "png" : coverFile.type === "image/webp" ? "webp" : "jpg";
+        const coverPath = `${user.id}/${Date.now()}-${sanitizedName}.${coverExt}`;
+
+        const { error: coverUploadError } = await supabase.storage
+          .from("book-cover-image")
+          .upload(coverPath, coverFile, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (coverUploadError) {
+          // Storage errors here are usually project setup, not user error, so name the fix.
+          const storageMessage = coverUploadError.message.toLowerCase();
+          if (storageMessage.includes("bucket not found")) {
+            throw new Error(
+              "Could not upload the cover image: the 'book-cover-image' bucket does not exist. Run supabase/create_book_cover_bucket.sql in the Supabase SQL editor."
+            );
+          }
+          if (storageMessage.includes("row-level security")) {
+            throw new Error(
+              "Could not upload the cover image: Supabase storage denied the upload (row-level security). The 'book-cover-image' bucket exists but its insert policy is missing — run supabase/create_book_cover_bucket.sql in the Supabase SQL editor."
+            );
+          }
+          throw new Error(`Could not upload the cover image: ${coverUploadError.message}`);
+        }
+
+        const { data: coverUrlData } = supabase.storage
+          .from("book-cover-image")
+          .getPublicUrl(coverPath);
+
+        if (!coverUrlData?.publicUrl) {
+          throw new Error("Could not resolve the uploaded cover image URL.");
+        }
+        uploadedCoverUrl = coverUrlData.publicUrl;
+      }
+
+      // 2. Upload PDF if selected
       if (pdfFile) {
         setUploadStatus("Uploading PDF book...");
         const fileExt = "pdf";
-        const sanitizedName = title.trim().toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30);
         const filePath = `${user.id}/${Date.now()}-${sanitizedName}.${fileExt}`;
 
         const { error: uploadError } = await supabase.storage
@@ -89,7 +170,7 @@ export default function CreateSessionPage() {
 
       setUploadStatus("Creating reading session...");
 
-      // 2. Insert reading session
+      // 3. Insert reading session
       const { data: sessionData, error: sessionError } = await supabase
         .from("reading_sessions")
         .insert({
@@ -100,6 +181,7 @@ export default function CreateSessionPage() {
           description: description.trim() || null,
           target_end_date: targetEndDate || null,
           pdf_url: uploadedPdfUrl,
+          cover_image_url: uploadedCoverUrl,
           status: "active",
         })
         .select()
@@ -107,7 +189,7 @@ export default function CreateSessionPage() {
 
       if (sessionError) throw sessionError;
 
-      // 3. Auto-join creator to session
+      // 4. Auto-join creator to session
       await supabase.from("session_members").insert({
         session_id: sessionData.id,
         user_id: user.id,
@@ -238,6 +320,58 @@ export default function CreateSessionPage() {
                 value={targetEndDate}
                 onChange={(e) => setTargetEndDate(e.target.value)}
               />
+            </div>
+          </div>
+
+          {/* Book Cover Upload Section */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
+              Book Cover Image (Optional)
+            </label>
+            <div className="border-2 border-dashed border-stone-200 dark:border-stone-800 rounded-2xl p-4 sm:p-5 hover:border-amber-400/80 transition-colors bg-[#FAF9F6] dark:bg-stone-900/50">
+              <input
+                type="file"
+                id="cover-upload"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleCoverChange}
+                className="hidden"
+              />
+              <label
+                htmlFor="cover-upload"
+                className="cursor-pointer flex items-center gap-4"
+              >
+                <div className="w-14 h-20 rounded-xl overflow-hidden bg-linear-to-br from-amber-100 via-amber-200 to-amber-300 dark:from-stone-800 dark:via-stone-700 dark:to-stone-700 flex items-center justify-center flex-shrink-0 shadow-sm border border-amber-200/40 dark:border-stone-700">
+                  {coverPreview ? (
+                    <img
+                      src={coverPreview}
+                      alt="Selected book cover preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <ImagePlus className="w-5 h-5 text-amber-800 dark:text-amber-400" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  {coverFile ? (
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-semibold text-sm">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span className="truncate">{coverFile.name}</span>
+                      <span className="text-xs text-stone-400 font-normal flex-shrink-0">
+                        ({(coverFile.size / (1024 * 1024)).toFixed(2)} MB)
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="block text-xs sm:text-sm font-semibold text-stone-800 dark:text-stone-200">
+                        Click to upload a cover image
+                      </span>
+                      <span className="block text-[11px] text-stone-400 mt-0.5">
+                        JPG, PNG or WebP up to 5MB. Without one, sessions use the default book cover.
+                      </span>
+                    </>
+                  )}
+                </div>
+              </label>
             </div>
           </div>
 

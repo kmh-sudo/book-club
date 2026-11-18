@@ -3,11 +3,36 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { Navbar, MobileNav } from "@/components/Navbar";
 
+
+const siteUrl = new URL(
+  process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
+);
+
 export const metadata: Metadata = {
+  metadataBase: siteUrl,
   title: "BookClub — Read & Discuss Together",
   description:
     "Join book reading sessions, track your reading progress with friends, and discuss your thoughts in focused chapter threads.",
+
+  openGraph: {
+    title: 'BookClub — Read & Discuss Together',
+    description: 'Join book reading sessions, track your reading progress with friends, and discuss your thoughts in focused chapter threads.',
+    url: '/',
+    siteName: 'BookClub',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'BookClub Preview',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
 };
+
+
 
 export default function RootLayout({
   children,
