@@ -94,7 +94,7 @@ function MobilePdfPage({ doc, pageNumber, width, aspect, rootRef }: MobilePdfPag
   return (
     <div
       ref={wrapperRef}
-      className="relative w-full bg-white dark:bg-stone-800 shadow-sm ring-1 ring-stone-900/5 overflow-hidden"
+      className="relative w-full bg-white shadow-sm ring-1 ring-line overflow-hidden"
       style={{
         width: `${width}px`,
         height: `${Math.round(width * aspect)}px`,
@@ -109,7 +109,7 @@ function MobilePdfPage({ doc, pageNumber, width, aspect, rootRef }: MobilePdfPag
         />
       )}
       {renderedWidth !== width && (
-        <div className="absolute inset-0 flex items-center justify-center text-[11px] text-stone-400">
+        <div className="absolute inset-0 flex items-center justify-center text-[11px] text-muted-ink/80">
           {failed ? `Page ${pageNumber} unavailable` : `Page ${pageNumber}`}
         </div>
       )}
@@ -202,9 +202,9 @@ export function MobilePdfReader({ pdfUrl, bookTitle }: MobilePdfReaderProps) {
 
   if (error) {
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center gap-3 p-6 text-center bg-stone-200/70 dark:bg-stone-950">
-        <FileText className="w-8 h-8 text-stone-400" />
-        <p className="text-xs text-stone-500 max-w-xs leading-relaxed">
+      <div className="h-full w-full flex flex-col items-center justify-center gap-3 p-6 text-center bg-sand/40">
+        <FileText className="w-8 h-8 text-muted-ink" />
+        <p className="text-xs text-muted-ink max-w-xs leading-relaxed">
           This PDF could not be displayed in the reader.
         </p>
         <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
@@ -220,12 +220,12 @@ export function MobilePdfReader({ pdfUrl, bookTitle }: MobilePdfReaderProps) {
   return (
     <div
       ref={scrollRef}
-      className="h-full w-full overflow-y-auto overflow-x-hidden bg-stone-200/70 dark:bg-stone-950"
+      className="h-full w-full overflow-y-auto overflow-x-hidden bg-sand/40"
       aria-label={`PDF for ${bookTitle}`}
     >
       {!doc ? (
-        <div className="h-full flex flex-col items-center justify-center gap-2 text-stone-500">
-          <Loader2 className="w-6 h-6 animate-spin text-amber-600" />
+        <div className="h-full flex flex-col items-center justify-center gap-2 text-muted-ink">
+          <Loader2 className="w-6 h-6 animate-spin text-gold-ink" />
           <span className="text-[11px] font-medium">
             {progress > 0 ? `Loading PDF… ${progress}%` : "Loading PDF…"}
           </span>

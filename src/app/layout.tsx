@@ -45,11 +45,11 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
       </head>
-      <body className="antialiased min-h-screen flex flex-col bg-[#FAF8F5] dark:bg-[#141210] text-stone-900 dark:text-stone-100 selection:bg-amber-200 selection:text-amber-900">
+      <body className="antialiased min-h-screen flex flex-col bg-canvas text-ink selection:bg-sand selection:text-teal">
         <AuthProvider>
           <Navbar />
           <main className="flex-1 pb-20 md:pb-10">{children}</main>

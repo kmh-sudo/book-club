@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { BookOpen, AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
+import { AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -56,27 +56,34 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-6 sm:p-8 rounded-3xl shadow-xl shadow-amber-900/5">
+    <div className="min-h-[calc(100vh-72px)] flex items-center justify-center px-4 py-12 relative overflow-hidden">
+      <div
+        aria-hidden
+        className="absolute -top-24 left-1/2 -translate-x-1/2 w-[34rem] h-[34rem] rounded-full bg-sand/50 blur-3xl pointer-events-none"
+      />
+      <Card className="relative w-full max-w-md p-7 sm:p-9 shadow-[0_2px_4px_rgba(38,59,63,0.04),0_40px_80px_-48px_rgba(38,59,63,0.5)]">
         <div className="text-center mb-8">
-          <div className="inline-flex w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 items-center justify-center mb-3 shadow-sm">
-            <BookOpen className="w-6 h-6" />
-          </div>
-          <h1 className="font-serif text-2xl font-bold text-stone-900 dark:text-stone-100">
-            Join the Club
-          </h1>
-          <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400 mt-1">
+          <img
+            src="/bclogo-icon.png"
+            alt="BookClub"
+            width={64}
+            height={64}
+            className="inline-block w-16 h-16 rounded-full ring-1 ring-line shadow-sm mb-4"
+          />
+          <p className="type-label text-gold-ink mb-2">Read Together</p>
+          <h1 className="type-h1 text-[28px] text-ink">Join the Club</h1>
+          <p className="type-small text-muted-ink mt-2">
             Read with peers, share perspectives, and reach your goals
           </p>
         </div>
 
         {registeredSuccess ? (
-          <div className="p-5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 rounded-2xl text-center space-y-3">
-            <CheckCircle2 className="w-10 h-10 text-emerald-600 dark:text-emerald-400 mx-auto" />
-            <h2 className="font-bold text-emerald-900 dark:text-emerald-200 text-base">
+          <div className="p-5 bg-sage-soft border border-sage/30 rounded-2xl text-center space-y-3">
+            <CheckCircle2 className="w-10 h-10 text-sage mx-auto" />
+            <h2 className="font-serif text-lg font-semibold text-ink">
               Account Created!
             </h2>
-            <p className="text-xs text-emerald-700 dark:text-emerald-400 leading-relaxed">
+            <p className="type-small text-muted-ink leading-relaxed">
               If email verification is enabled on your project, please check your inbox to confirm, then sign in.
             </p>
             <Link href="/auth/login" className="inline-block pt-1">
@@ -86,7 +93,7 @@ export default function RegisterPage() {
         ) : (
           <>
             {error && (
-              <div className="mb-6 p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-xl flex items-start gap-2.5 text-xs sm:text-sm text-red-700 dark:text-red-300">
+              <div className="mb-6 p-3.5 bg-danger/10 border border-danger/25 rounded-xl flex items-start gap-2.5 text-xs sm:text-sm text-danger">
                 <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
@@ -94,7 +101,7 @@ export default function RegisterPage() {
 
             <form onSubmit={handleRegister} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400 mb-1.5">
+                <label className="block type-label text-muted-ink mb-1.5">
                   Full Name
                 </label>
                 <Input
@@ -107,7 +114,7 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400 mb-1.5">
+                <label className="block type-label text-muted-ink mb-1.5">
                   Username
                 </label>
                 <Input
@@ -120,7 +127,7 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400 mb-1.5">
+                <label className="block type-label text-muted-ink mb-1.5">
                   Email Address
                 </label>
                 <Input
@@ -133,7 +140,7 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400 mb-1.5">
+                <label className="block type-label text-muted-ink mb-1.5">
                   Password
                 </label>
                 <Input
@@ -150,18 +157,18 @@ export default function RegisterPage() {
                 type="submit"
                 disabled={loading}
                 size="lg"
-                className="w-full gap-2 shadow-md shadow-amber-600/20"
+                className="w-full gap-2 mt-2"
               >
                 <span>{loading ? "Creating Account..." : "Create Account"}</span>
                 {!loading && <ArrowRight className="w-4 h-4" />}
               </Button>
             </form>
 
-            <p className="mt-8 text-center text-xs sm:text-sm text-stone-500 dark:text-stone-400">
+            <p className="mt-8 text-center type-small text-muted-ink">
               Already have an account?{" "}
               <Link
                 href="/auth/login"
-                className="text-amber-700 dark:text-amber-400 font-bold hover:underline"
+                className="text-gold-ink font-bold hover:underline"
               >
                 Sign In
               </Link>
