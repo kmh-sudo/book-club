@@ -1,8 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
-import { FileText, ExternalLink, Loader2 } from "lucide-react";
+import { FileText, ExternalLink, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface MobilePdfReaderProps {
@@ -27,7 +34,13 @@ interface MobilePdfPageProps {
  * pages far away release their bitmap (kept as an empty reserved box) so long
  * books stay within mobile canvas-memory limits.
  */
-function MobilePdfPage({ doc, pageNumber, width, aspect, rootRef }: MobilePdfPageProps) {
+const MobilePdfPage = memo(function MobilePdfPage({
+  doc,
+  pageNumber,
+  width,
+  aspect,
+  rootRef,
+}: MobilePdfPageProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [near, setNear] = useState(false);
@@ -115,7 +128,7 @@ function MobilePdfPage({ doc, pageNumber, width, aspect, rootRef }: MobilePdfPag
       )}
     </div>
   );
-}
+});
 
 /**
  * Inline PDF reader for small screens. Renders pages itself instead of using an
@@ -129,9 +142,15 @@ export function MobilePdfReader({ pdfUrl, bookTitle }: MobilePdfReaderProps) {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [width, setWidth] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageInput, setPageInput] = useState("1");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<HTMLDivElement>(null);
+  const pageInputRef = useRef<HTMLInputElement>(null);
+  const pageOffsetsRef = useRef<number[]>([]);
+  const currentPageRef = useRef(1);
+  const scrollFrameRef = useRef(0);
 
   /* Load the document on the client only — pdf.js needs DOM APIs. */
   useEffect(() => {
@@ -191,6 +210,18 @@ export function MobilePdfReader({ pdfUrl, bookTitle }: MobilePdfReaderProps) {
     if (available > 0) setWidth(Math.min(available, MAX_PAGE_WIDTH));
   }, []);
 
+  /** Cache each page's offset inside the scroller so page tracking is O(distance), not O(DOM). */
+  const measurePageOffsets = useCallback(() => {
+    const scroller = scrollRef.current;
+    const pages = pagesRef.current;
+    if (!scroller || !pages) return;
+    const scrollerTop = scroller.getBoundingClientRect().top;
+    pageOffsetsRef.current = Array.from(pages.children).map((child) => {
+      const rect = (child as HTMLElement).getBoundingClientRect();
+      return rect.top - scrollerTop + scroller.scrollTop;
+    });
+  }, []);
+
   useEffect(() => {
     measure();
     const node = scrollRef.current;
@@ -199,6 +230,72 @@ export function MobilePdfReader({ pdfUrl, bookTitle }: MobilePdfReaderProps) {
     observer.observe(node);
     return () => observer.disconnect();
   }, [measure, doc]);
+
+  /* Page boxes only change with the fitted width or the document itself. */
+  useEffect(() => {
+    measurePageOffsets();
+  }, [width, numPages, aspect, measurePageOffsets]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollFrameRef.current) cancelAnimationFrame(scrollFrameRef.current);
+    };
+  }, []);
+
+  const setPage = useCallback((page: number) => {
+    currentPageRef.current = page;
+    setCurrentPage(page);
+    if (document.activeElement !== pageInputRef.current) {
+      setPageInput(String(page));
+    }
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    if (scrollFrameRef.current) return;
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      scrollFrameRef.current = 0;
+      const scroller = scrollRef.current;
+      const offsets = pageOffsetsRef.current;
+      if (!scroller || offsets.length === 0) return;
+
+      const y = scroller.scrollTop + 12;
+      let index = 0;
+      while (index + 1 < offsets.length && offsets[index + 1] <= y) index += 1;
+
+      const page = index + 1;
+      if (page !== currentPageRef.current) setPage(page);
+    });
+  }, [setPage]);
+
+  const goToPage = useCallback(
+    (target: number, behavior: ScrollBehavior = "smooth") => {
+      if (!numPages) return;
+      const page = Math.min(Math.max(target, 1), numPages);
+      const scroller = scrollRef.current;
+      const offset = pageOffsetsRef.current[page - 1];
+      if (scroller && typeof offset === "number") {
+        scroller.scrollTo({ top: Math.max(0, offset - 4), behavior });
+      }
+      setPage(page);
+    },
+    [numPages, setPage]
+  );
+
+  const handlePageSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const parsed = parseInt(pageInput, 10);
+    if (Number.isFinite(parsed)) {
+      const target = Math.min(Math.max(parsed, 1), numPages);
+      // A hand-typed jump can span hundreds of pages — land immediately instead
+      // of animating through the whole document.
+      goToPage(target, "auto");
+      // Reflect the clamped page even if the field keeps focus.
+      setPageInput(String(target));
+    } else {
+      setPageInput(String(currentPageRef.current));
+    }
+    pageInputRef.current?.blur();
+  };
 
   if (error) {
     return (
@@ -218,33 +315,87 @@ export function MobilePdfReader({ pdfUrl, bookTitle }: MobilePdfReaderProps) {
   }
 
   return (
-    <div
-      ref={scrollRef}
-      className="h-full w-full overflow-y-auto overflow-x-hidden bg-sand/40"
-      aria-label={`PDF for ${bookTitle}`}
-    >
-      {!doc ? (
-        <div className="h-full flex flex-col items-center justify-center gap-2 text-muted-ink">
-          <Loader2 className="w-6 h-6 animate-spin text-gold-ink" />
-          <span className="text-[11px] font-medium">
-            {progress > 0 ? `Loading PDF… ${progress}%` : "Loading PDF…"}
-          </span>
-        </div>
-      ) : (
-        <div ref={pagesRef} className="flex flex-col items-center gap-3 p-3">
-          {width > 0 &&
-            Array.from({ length: numPages }, (_, index) => (
-              <MobilePdfPage
-                key={index}
-                doc={doc}
-                pageNumber={index + 1}
-                width={width}
-                aspect={aspect}
-                rootRef={scrollRef}
-              />
-            ))}
+    <div className="flex h-full w-full flex-col bg-sand/40">
+      {/* Mobile page navigation — mirrors the page controls of the desktop
+          native PDF viewer, which mobile browsers do not render inline. */}
+      {doc && numPages > 0 && (
+        <div className="flex items-center justify-between gap-2 px-2.5 py-2 bg-canvas/85 backdrop-blur border-b border-line flex-shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage <= 1}
+            aria-label="Previous page"
+            className="h-8 w-8 p-0 rounded-lg text-ink disabled:opacity-40"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+
+          <form
+            onSubmit={handlePageSubmit}
+            className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-ink"
+          >
+            <label htmlFor="mobile-page-number" className="sr-only">
+              Page number
+            </label>
+            <input
+              id="mobile-page-number"
+              ref={pageInputRef}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={pageInput}
+              onChange={(e) => setPageInput(e.target.value.replace(/[^0-9]/g, ""))}
+              onFocus={(e) => e.target.select()}
+              onBlur={() => setPageInput(String(currentPageRef.current))}
+              aria-label={`Page number, ${numPages} pages`}
+              className="w-11 h-7 px-1 text-center text-xs font-bold text-ink bg-card border border-line rounded-md focus:outline-none focus:ring-2 focus:ring-gold/50"
+            />
+            <span aria-live="polite">of {numPages}</span>
+          </form>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={currentPage >= numPages}
+            aria-label="Next page"
+            className="h-8 w-8 p-0 rounded-lg text-ink disabled:opacity-40"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
         </div>
       )}
+
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y"
+        aria-label={`PDF for ${bookTitle}`}
+      >
+        {!doc ? (
+          <div className="h-full flex flex-col items-center justify-center gap-2 text-muted-ink">
+            <Loader2 className="w-6 h-6 animate-spin text-gold-ink" />
+            <span className="text-[11px] font-medium">
+              {progress > 0 ? `Loading PDF… ${progress}%` : "Loading PDF…"}
+            </span>
+          </div>
+        ) : (
+          <div ref={pagesRef} className="flex flex-col items-center gap-3 p-3">
+            {width > 0 &&
+              Array.from({ length: numPages }, (_, index) => (
+                <MobilePdfPage
+                  key={index}
+                  doc={doc}
+                  pageNumber={index + 1}
+                  width={width}
+                  aspect={aspect}
+                  rootRef={scrollRef}
+                />
+              ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
