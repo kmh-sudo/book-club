@@ -67,23 +67,23 @@ export function ProgressUpdater({
   const percentage = Math.round((currentChapter / totalChapters) * 100);
 
   return (
-    <Card className="p-5 sm:p-6 bg-linear-to-br from-amber-500/10 via-amber-600/5 to-transparent border-amber-200/80 dark:border-stone-800 space-y-4">
+    <Card className="p-5 sm:p-6 bg-linear-to-br from-sand/50 via-sand/25 to-transparent border-gold/40 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-ink">
             Your Reading Progress
           </span>
-          <p className="text-base font-bold text-stone-900 dark:text-stone-100">
+          <p className="text-base font-bold text-ink">
             Chapter {currentChapter} of {totalChapters} ({percentage}%)
           </p>
         </div>
         {currentChapter >= totalChapters ? (
-          <Badge variant="default" className="gap-1.5 px-3 py-1 font-bold text-xs bg-amber-600 animate-bounce">
+          <Badge variant="default" className="gap-1.5 px-3 py-1 font-bold text-xs bg-primary animate-bounce">
             <Trophy className="w-3.5 h-3.5" />
             Book Completed!
           </Badge>
         ) : (
-          <span className="text-xs font-semibold text-stone-500">
+          <span className="text-xs font-semibold text-muted-ink">
             {totalChapters - currentChapter} chapters remaining
           </span>
         )}
@@ -99,7 +99,7 @@ export function ProgressUpdater({
           size="sm"
           onClick={() => handleUpdate(currentChapter - 1)}
           disabled={saving || currentChapter <= 0}
-          className="rounded-xl gap-1"
+          className="gap-1"
         >
           <Minus className="w-3.5 h-3.5" />
           <span>-1 Ch</span>
@@ -109,7 +109,7 @@ export function ProgressUpdater({
           size="sm"
           onClick={() => handleUpdate(currentChapter + 1)}
           disabled={saving || currentChapter >= totalChapters}
-          className="rounded-xl gap-1 shadow-sm"
+          className="gap-1 shadow-sm"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>+1 Chapter</span>
@@ -122,7 +122,7 @@ export function ProgressUpdater({
             size="sm"
             onClick={() => handleUpdate(totalChapters)}
             disabled={saving}
-            className="ml-auto rounded-xl gap-1 text-emerald-700 bg-emerald-100/70 hover:bg-emerald-200/70 dark:bg-emerald-950/60 dark:text-emerald-300"
+            className="ml-auto gap-1 text-sage bg-sage-soft hover:bg-sage-soft"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Mark Finished</span>

@@ -166,8 +166,15 @@ create policy "Session members can post comments" on public.comments
 create policy "Authors can update their comments" on public.comments
   for update using (auth.uid() = user_id);
 
-create policy "Authors can delete their comments" on public.comments
-  for delete using (auth.uid() = user_id);
+create policy "Authors and session creators can delete comments" on public.comments
+  for delete using (
+    auth.uid() = user_id or
+    exists (
+      select 1 from public.reading_sessions
+      where reading_sessions.id = comments.session_id
+      and reading_sessions.creator_id = auth.uid()
+    )
+  );
 
 -- Comment Reactions Policies
 create policy "Comment reactions are viewable by everyone" on public.comment_reactions

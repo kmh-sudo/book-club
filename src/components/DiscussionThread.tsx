@@ -19,6 +19,7 @@ import {
   LogIn,
   AlertCircle,
   Trophy,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -26,6 +27,8 @@ const ALLOWED_EMOJIS = ["👍", "❤️", "💡", "👏", "😮"] as const;
 
 interface DiscussionThreadProps {
   sessionId: string;
+  /** Author of the session — allowed to moderate any comment in it. */
+  sessionCreatorId?: string;
   isMember: boolean;
   totalChapters: number;
   memberProgressMap?: Record<string, { current_chapter: number; is_completed: boolean }>;
@@ -42,6 +45,7 @@ interface EnrichedComment extends Comment {
 
 export function DiscussionThread({
   sessionId,
+  sessionCreatorId,
   isMember,
   totalChapters,
   memberProgressMap = {},
@@ -56,7 +60,9 @@ export function DiscussionThread({
   const [isSpoiler, setIsSpoiler] = useState(false);
   const [revealedSpoilers, setRevealedSpoilers] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
@@ -234,23 +240,67 @@ export function DiscussionThread({
     }
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    if (!user) return;
+
+    const comment = comments.find((c) => c.id === commentId);
+    if (!comment) return;
+
+    const isAuthor = comment.user_id === user.id;
+    const isSessionCreator = user.id === sessionCreatorId;
+    if (!isAuthor && !isSessionCreator) return;
+
+    const promptText = isAuthor
+      ? "Delete your comment? This cannot be undone."
+      : "Delete this reader's comment as the session host? This cannot be undone.";
+    if (!confirm(promptText)) return;
+
+    setDeletingCommentId(commentId);
+    setDeleteError(null);
+
+    const snapshot = comments;
+    setComments((prev) => prev.filter((c) => c.id !== commentId));
+
+    try {
+      const { error: deleteCommentError } = await supabase
+        .from("comments")
+        .delete()
+        .eq("id", commentId);
+
+      if (deleteCommentError) throw deleteCommentError;
+    } catch (err: unknown) {
+      console.error("Delete comment failed:", err);
+      setComments(snapshot);
+      const code = (err as { code?: string } | null)?.code;
+      setDeleteError(
+        code === "42501"
+          ? "This comment can't be deleted yet — run supabase/migration_comment_deletion.sql in Supabase to allow hosts to moderate comments."
+          : err instanceof Error && err.message
+            ? err.message
+            : "Could not delete this comment. Please try again."
+      );
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
+
   const toggleSpoiler = (id: string) => {
     setRevealedSpoilers((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   return (
-    <Card className="flex flex-col h-[600px] lg:h-[calc(100vh-280px)] lg:min-h-[500px] lg:max-h-[800px] p-5 sm:p-6 rounded-3xl border-stone-200/90 dark:border-stone-800 shadow-sm bg-white/90 dark:bg-stone-900/90 backdrop-blur-md">
+    <Card className="flex flex-col h-[600px] lg:h-[calc(100vh-280px)] lg:min-h-[500px] lg:max-h-[800px] p-5 sm:p-6 rounded-card border-line shadow-sm bg-card backdrop-blur-md">
       {/* Thread Header */}
-      <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-stone-100 dark:border-stone-800 flex-shrink-0">
+      <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-line flex-shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-2xl bg-amber-100 dark:bg-stone-800 text-amber-700 dark:text-amber-400">
+          <div className="p-2 rounded-2xl bg-sand text-gold-ink">
             <MessageSquare className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-serif text-base sm:text-lg font-bold text-stone-900 dark:text-stone-100 leading-tight">
+            <h3 className="font-serif text-base sm:text-lg font-bold text-ink leading-tight">
               Session Discussion
             </h3>
-            <p className="text-[11px] text-stone-500">
+            <p className="text-[11px] text-muted-ink">
               Live thoughts & chapter reactions
             </p>
           </div>
@@ -260,6 +310,13 @@ export function DiscussionThread({
         </Badge>
       </div>
 
+      {deleteError && (
+        <div className="mb-3 p-2.5 bg-danger/10 text-danger border border-danger/25 rounded-xl text-xs flex items-start gap-1.5 flex-shrink-0">
+          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          <span>{deleteError}</span>
+        </div>
+      )}
+
       {/* Comment List (Scrollable Area) */}
       <div className="flex-1 space-y-3.5 overflow-y-auto pr-1">
         {loading ? (
@@ -267,7 +324,7 @@ export function DiscussionThread({
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="h-20 rounded-2xl bg-stone-100 dark:bg-stone-800 animate-pulse"
+                className="h-20 rounded-2xl bg-sand/50 animate-pulse"
               />
             ))}
           </div>
@@ -278,25 +335,29 @@ export function DiscussionThread({
             const authorPercent = authorProgress
               ? Math.min(100, Math.round((authorProgress.current_chapter / totalChapters) * 100))
               : 0;
+            const canDelete =
+              !!user &&
+              (user.id === comment.user_id || user.id === sessionCreatorId);
+            const isDeletingThisComment = deletingCommentId === comment.id;
 
             return (
               <div
                 key={comment.id}
-                className="group relative bg-[#FAF9F6] dark:bg-stone-800/50 rounded-2xl p-3.5 sm:p-4 border border-stone-200/70 dark:border-stone-800 space-y-2.5 transition-all hover:border-amber-300/50 shadow-sm"
+                className="group relative bg-canvas/60 rounded-2xl p-3.5 sm:p-4 border border-line/70 space-y-2.5 transition-all hover:border-gold/50 shadow-sm"
               >
                 {/* Author Info & Progress Bar Inline */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-full bg-linear-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-[10px] uppercase flex-shrink-0 shadow-sm">
+                      <div className="w-7 h-7 rounded-full bg-linear-to-tr from-teal to-teal-soft text-cream flex items-center justify-center font-bold text-[10px] uppercase flex-shrink-0 shadow-sm">
                         {comment.author?.username?.charAt(0) || "U"}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-bold text-stone-900 dark:text-stone-100 truncate">
+                          <span className="text-xs font-bold text-ink truncate">
                             {comment.author?.full_name || comment.author?.username || "Reader"}
                           </span>
-                          <span className="text-[10px] text-amber-600 font-medium">
+                          <span className="text-[10px] text-gold-ink font-medium">
                             @{comment.author?.username || "member"}
                           </span>
                         </div>
@@ -304,13 +365,33 @@ export function DiscussionThread({
                     </div>
 
                     <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteComment(comment.id)}
+                          disabled={isDeletingThisComment}
+                          title={
+                            comment.user_id === user?.id
+                              ? "Delete your comment"
+                              : "Delete comment as session host"
+                          }
+                          aria-label={
+                            comment.user_id === user?.id
+                              ? "Delete your comment"
+                              : "Delete comment as session host"
+                          }
+                          className="p-1 rounded-md text-muted-ink/60 hover:text-danger hover:bg-danger/10 transition-colors disabled:opacity-40 disabled:cursor-wait"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       {comment.chapter_reference && (
                         <Badge variant="secondary" className="gap-0.5 text-[10px] font-bold px-1.5 py-0">
-                          <Bookmark className="w-2.5 h-2.5 text-amber-600" />
+                          <Bookmark className="w-2.5 h-2.5 text-gold-ink" />
                           <span>Ch. {comment.chapter_reference}</span>
                         </Badge>
                       )}
-                      <span className="text-[10px] text-stone-400">
+                      <span className="text-[10px] text-muted-ink/80">
                         {formatTimeAgo(comment.created_at)}
                       </span>
                     </div>
@@ -318,16 +399,16 @@ export function DiscussionThread({
 
                   {/* User Reading Progress Bar Inside Comment */}
                   {authorProgress && (
-                    <div className="flex items-center gap-2 bg-white/70 dark:bg-stone-900/60 px-2 py-1 rounded-lg border border-stone-200/50 dark:border-stone-800">
-                      <span className="text-[10px] font-semibold text-stone-500 whitespace-nowrap">
+                    <div className="flex items-center gap-2 bg-card px-2 py-1 rounded-lg border border-line/50">
+                      <span className="text-[10px] font-semibold text-muted-ink whitespace-nowrap">
                         Reader Progress:
                       </span>
                       <div className="flex-1">
                         <Progress value={authorPercent} className="h-1.5" />
                       </div>
-                      <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 whitespace-nowrap flex items-center gap-1">
+                      <span className="text-[10px] font-bold text-gold-ink whitespace-nowrap flex items-center gap-1">
                         {authorProgress.is_completed ? (
-                          <span className="text-emerald-600 flex items-center gap-0.5">
+                          <span className="text-sage flex items-center gap-0.5">
                             <Trophy className="w-2.5 h-2.5" /> Finished
                           </span>
                         ) : (
@@ -346,7 +427,7 @@ export function DiscussionThread({
                         variant="ghost"
                         size="sm"
                         onClick={() => toggleSpoiler(comment.id)}
-                        className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 h-auto p-0 hover:bg-transparent"
+                        className="text-[10px] font-semibold text-danger h-auto p-0 hover:bg-transparent"
                       >
                         {isSpoilerHidden ? (
                           <>
@@ -364,7 +445,7 @@ export function DiscussionThread({
                   )}
 
                   <p
-                    className={`text-xs sm:text-sm text-stone-800 dark:text-stone-200 leading-relaxed whitespace-pre-wrap ${
+                    className={`text-xs sm:text-sm text-ink leading-relaxed whitespace-pre-wrap ${
                       isSpoilerHidden ? "filter blur-sm select-none" : ""
                     }`}
                   >
@@ -373,7 +454,7 @@ export function DiscussionThread({
                 </div>
 
                 {/* Reactions Toolbar */}
-                <div className="pt-1.5 flex flex-wrap items-center gap-1 border-t border-stone-200/50 dark:border-stone-800/80">
+                <div className="pt-1.5 flex flex-wrap items-center gap-1 border-t border-line/50">
                   {comment.reactions.map(({ emoji, count, hasReacted }) => (
                     <button
                       key={emoji}
@@ -381,8 +462,8 @@ export function DiscussionThread({
                       disabled={!isMember}
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-all ${
                         hasReacted
-                          ? "bg-amber-100/90 border-amber-300 text-amber-900 dark:bg-amber-950/80 dark:border-amber-700 dark:text-amber-200 scale-105 shadow-sm"
-                          : "bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                          ? "bg-sand/90 border-gold/40 text-ink scale-105 shadow-sm"
+                          : "bg-card border-line text-muted-ink hover:bg-sand/50"
                       } ${!isMember ? "opacity-60 cursor-not-allowed" : "active:scale-95"}`}
                     >
                       <span>{emoji}</span>
@@ -394,8 +475,8 @@ export function DiscussionThread({
             );
           })
         ) : (
-          <div className="text-center py-12 px-4 border border-dashed border-stone-200 dark:border-stone-800 rounded-2xl">
-            <p className="text-xs text-stone-500">
+          <div className="text-center py-12 px-4 border border-dashed border-line rounded-2xl">
+            <p className="text-xs text-muted-ink">
               No comments yet in this session. Start the conversation below!
             </p>
           </div>
@@ -404,10 +485,10 @@ export function DiscussionThread({
       </div>
 
       {/* Composer Section */}
-      <div className="pt-3 border-t border-stone-100 dark:border-stone-800 flex-shrink-0">
+      <div className="pt-3 border-t border-line flex-shrink-0">
         {!user ? (
-          <Card className="p-3 bg-amber-50/60 dark:bg-stone-800/60 border-amber-200/60 flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold text-stone-700 dark:text-stone-300">
+          <Card className="p-3 bg-sand/60 border-gold/30 flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-ink">
               Sign in to post comments & react
             </p>
             <Link href="/auth/login">
@@ -418,15 +499,15 @@ export function DiscussionThread({
             </Link>
           </Card>
         ) : !isMember ? (
-          <Card className="p-3 bg-amber-50/80 dark:bg-stone-800/60 border-amber-200 text-center">
-            <p className="text-xs font-bold text-amber-900 dark:text-amber-300">
+          <Card className="p-3 bg-sand/80 border-gold/40 text-center">
+            <p className="text-xs font-bold text-ink">
               Join this session to post comments & discuss
             </p>
           </Card>
         ) : (
           <form onSubmit={handlePostComment} className="space-y-2.5">
             {error && (
-              <div className="p-2 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs flex items-center gap-1.5">
+              <div className="p-2 bg-danger/10 text-danger border border-danger/25 rounded-xl text-xs flex items-center gap-1.5">
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>{error}</span>
               </div>
@@ -443,12 +524,12 @@ export function DiscussionThread({
 
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 text-[11px] text-stone-600 dark:text-stone-400">
-                  <Bookmark className="w-3 h-3 text-amber-600" />
+                <div className="flex items-center gap-1 text-[11px] text-muted-ink">
+                  <Bookmark className="w-3 h-3 text-gold-ink" />
                   <select
                     value={chapterRef}
                     onChange={(e) => setChapterRef(e.target.value)}
-                    className="px-2 py-1 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-[11px] text-stone-700 dark:text-stone-300 focus:outline-none"
+                    className="px-2 py-1 rounded-lg border border-line bg-card text-[11px] text-ink focus:outline-none"
                   >
                     <option value="">General</option>
                     {Array.from({ length: totalChapters }, (_, i) => i + 1).map((ch) => (
@@ -459,12 +540,12 @@ export function DiscussionThread({
                   </select>
                 </div>
 
-                <label className="flex items-center gap-1 text-[11px] text-stone-600 dark:text-stone-400 cursor-pointer select-none">
+                <label className="flex items-center gap-1 text-[11px] text-muted-ink cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={isSpoiler}
                     onChange={(e) => setIsSpoiler(e.target.checked)}
-                    className="rounded text-amber-600 focus:ring-amber-500 h-3.5 w-3.5"
+                    className="rounded accent-gold text-gold-ink focus:ring-gold/50 h-3.5 w-3.5"
                   />
                   <span>Spoiler</span>
                 </label>

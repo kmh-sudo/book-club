@@ -1,67 +1,193 @@
 @import "tailwindcss";
 
-/* ——— Design tokens ——— */
+/* ————————————————————————————————————————————————
+   BookClub design tokens
+   Palette sampled from public/bclogo1.png:
+     deep teal #263B3F · cream #EEDCC4 · gold #D4A373
+   Warm, low-contrast surfaces for a calm reading-room feel.
+   ———————————————————————————————————————————————— */
 :root {
-  --background: #FAF8F5;
-  --foreground: #292524;
-  --card: #FFFFFF;
-  --card-foreground: #292524;
-  --popover: #FFFFFF;
-  --popover-foreground: #292524;
-  --primary: #D97706;
-  --primary-foreground: #FFFFFF;
-  --secondary: #F5EBE1;
-  --secondary-foreground: #78350F;
-  --muted: #F3ECE2;
-  --muted-foreground: #78716C;
-  --accent: #FDE68A;
-  --accent-foreground: #78350F;
-  --destructive: #EF4444;
-  --destructive-foreground: #FFFFFF;
-  --border: #E7DFD5;
-  --input: #E7DFD5;
-  --ring: #D97706;
-  --radius: 1rem;
+  /* Surfaces */
+  --background: #f6efe3;
+  --foreground: #223a3d;
+  --card: #fcf7ee;
+  --card-foreground: #223a3d;
+  --popover: #fcf7ee;
+  --popover-foreground: #223a3d;
+
+  /* Actions & accents */
+  --primary: #263b3f;
+  --primary-foreground: #f8f1e5;
+  --secondary: #eedcc4;
+  --secondary-foreground: #3d3120;
+  --secondary-hover: #e5d0b2;
+  --accent: #d4a373;
+  --accent-hover: #c8935f;
+  --accent-foreground: #3a2614;
+
+  /* Text & lines */
+  --muted: #efe6d7;
+  --muted-foreground: #6b6154;
+  --border: #e4d7c3;
+  --input: #e4d7c3;
+  --ring: #b98a5b;
+
+  /* Fixed brand anchors (do not flip in dark mode) */
+  --teal: #263b3f;
+  --teal-deep: #1b2d30;
+  --teal-soft: #385256;
+  --cream: #f7f0e4;
+  --cream-deep: #eedcc4;
+  --gold: #d4a373;
+  --gold-ink: #8a5a2e;
+
+  /* Support */
+  --sage: #4f6b52;
+  --sage-soft: #e4ead9;
+  --destructive: #a8432f;
+  --destructive-foreground: #fdf5ef;
+
+  --radius: 1.25rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #141210;
-    --foreground: #F5F5F4;
-    --card: #1C1917;
-    --card-foreground: #F5F5F4;
-    --popover: #1C1917;
-    --popover-foreground: #F5F5F4;
-    --primary: #F59E0B;
-    --primary-foreground: #1C1917;
-    --secondary: #292524;
-    --secondary-foreground: #FDE68A;
-    --muted: #292524;
-    --muted-foreground: #A8A29E;
-    --accent: #292524;
-    --accent-foreground: #F5F5F4;
-    --destructive: #7F1D1D;
-    --destructive-foreground: #FEE2E2;
-    --border: #292524;
-    --input: #292524;
-    --ring: #F59E0B;
+    --background: #142326;
+    --foreground: #f2e9db;
+    --card: #1a2c2f;
+    --card-foreground: #f2e9db;
+    --popover: #1a2c2f;
+    --popover-foreground: #f2e9db;
+
+    --primary: #d4a373;
+    --primary-foreground: #1b2d30;
+    --secondary: #24383b;
+    --secondary-foreground: #f0e2cc;
+    --secondary-hover: #2d4448;
+    --accent: #d4a373;
+    --accent-hover: #e0b58d;
+    --accent-foreground: #1b2d30;
+
+    --muted: #1f3235;
+    --muted-foreground: #b3a794;
+    --border: #2c4144;
+    --input: #2c4144;
+    --ring: #d4a373;
+
+    --gold-ink: #e3c09b;
+    --sage: #a8bfa2;
+    --sage-soft: #25382c;
+    --destructive: #e08a75;
+    --destructive-foreground: #2a1511;
+
+    --radius: 1.25rem;
   }
 }
 
-/* ——— Base styles ——— */
+/* Semantic Tailwind theme: these utilities flip with the color scheme. */
+@theme inline {
+  --color-canvas: var(--background);
+  --color-ink: var(--foreground);
+  --color-card: var(--card);
+  --color-card-ink: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-ink: var(--muted-foreground);
+  --color-line: var(--border);
+
+  --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-foreground);
+  --color-sand: var(--secondary);
+  --color-sand-ink: var(--secondary-foreground);
+  --color-sand-hover: var(--secondary-hover);
+  --color-gold: var(--accent);
+  --color-gold-hover: var(--accent-hover);
+  --color-gold-ink: var(--gold-ink);
+
+  --color-teal: var(--teal);
+  --color-teal-deep: var(--teal-deep);
+  --color-teal-soft: var(--teal-soft);
+  --color-cream: var(--cream);
+  --color-cream-deep: var(--cream-deep);
+
+  --color-sage: var(--sage);
+  --color-sage-soft: var(--sage-soft);
+  --color-danger: var(--destructive);
+  --color-danger-ink: var(--destructive-foreground);
+
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-serif: Fraunces, "Iowan Old Style", "Palatino Linotype", Palatino,
+    Georgia, serif;
+
+  --radius-card: 1.5rem;
+}
+
+/* ——— Base ——— */
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: "Inter var", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
 }
 
-/* Make font-serif use a nice serif stack (Lora → Georgia → serif) */
 .font-serif {
-  font-family: Lora, "Palatino Linotype", Palatino, "Book Antiqua", Georgia,
-    "Times New Roman", Times, serif;
+  font-family: var(--font-serif);
+  font-variation-settings: "SOFT" 30, "WONK" 0;
+}
+
+/* ——— Typographic scale ———
+   display 56/1.05 · h1 40/1.12 · h2 28/1.25 · h3 20/1.4
+   body 16/1.65 · small 13/1.6 · label 11/1.4
+*/
+@layer components {
+  .type-display {
+    font-family: var(--font-serif);
+    font-size: clamp(2.5rem, 5.2vw, 3.5rem);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    font-variation-settings: "SOFT" 30, "WONK" 0;
+  }
+  .type-h1 {
+    font-family: var(--font-serif);
+    font-size: clamp(1.9rem, 3.4vw, 2.5rem);
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+    font-weight: 600;
+  }
+  .type-h2 {
+    font-family: var(--font-serif);
+    font-size: 1.75rem;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+  }
+  .type-h3 {
+    font-family: var(--font-serif);
+    font-size: 1.25rem;
+    line-height: 1.4;
+    font-weight: 600;
+  }
+  .type-body {
+    font-size: 1rem;
+    line-height: 1.65;
+  }
+  .type-small {
+    font-size: 0.8125rem;
+    line-height: 1.6;
+  }
+  .type-label {
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
 }
 
 /* ——— Smooth scroll ——— */
@@ -71,21 +197,29 @@ html {
 
 /* ——— Custom scrollbars ——— */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(180, 83, 9, 0.18);
+  background: color-mix(in srgb, var(--gold) 45%, transparent);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(180, 83, 9, 0.38);
+  background: color-mix(in srgb, var(--gold) 70%, transparent);
 }
 
 /* ——— Safe-area padding utilities for mobile bottom nav ——— */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ——— Focus ring shared look ——— */
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  box-shadow: 0 0 0 2px var(--background), 0 0 0 4px color-mix(in srgb, var(--ring) 70%, transparent);
 }

@@ -4,26 +4,26 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold tracking-[0.01em] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-50 active:scale-[0.985]",
   {
     variants: {
       variant: {
         default:
-          "bg-linear-to-r from-amber-600 to-amber-700 text-white shadow-md shadow-amber-600/20 hover:from-amber-700 hover:to-amber-800 hover:shadow-lg hover:shadow-amber-600/30",
+          "bg-primary text-primary-ink shadow-sm shadow-teal/20 hover:bg-teal-deep hover:shadow-md hover:shadow-teal/25",
         destructive:
-          "bg-red-600 text-white shadow-sm hover:bg-red-700 active:scale-95",
+          "bg-danger text-danger-ink shadow-sm hover:opacity-90",
         outline:
-          "border border-stone-200 bg-white/80 hover:bg-amber-50/50 hover:text-amber-900 dark:border-stone-800 dark:bg-stone-900/80 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300",
+          "border border-line bg-card/70 text-ink hover:border-gold/70 hover:bg-card",
         secondary:
-          "bg-amber-100/70 text-amber-900 hover:bg-amber-200/70 dark:bg-stone-800 dark:text-amber-300 dark:hover:bg-stone-700",
+          "bg-sand text-sand-ink hover:bg-sand-hover",
         ghost:
-          "hover:bg-amber-100/50 hover:text-amber-900 dark:hover:bg-stone-800 dark:text-stone-300 text-stone-600",
-        link: "text-amber-700 underline-offset-4 hover:underline dark:text-amber-400 p-0 h-auto font-medium",
+          "text-muted-ink hover:bg-sand/60 hover:text-ink",
+        link: "text-gold-ink underline-offset-4 hover:underline p-0 h-auto font-semibold",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-8 rounded-lg px-3 text-xs",
-        lg: "h-11 rounded-2xl px-6 text-base shadow-lg",
+        default: "h-10 px-5 py-2",
+        sm: "h-8 rounded-full px-3.5 text-xs",
+        lg: "h-12 rounded-full px-7 text-[15px]",
         icon: "h-9 w-9 p-0",
       },
     },

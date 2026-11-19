@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { BookOpen, AlertCircle, ArrowLeft, Plus, FileText, Upload, CheckCircle2 } from "lucide-react";
+import { BookOpen, AlertCircle, ArrowLeft, Plus, Upload, CheckCircle2, ImagePlus } from "lucide-react";
 
 export default function CreateSessionPage() {
   const router = useRouter();
@@ -22,6 +22,8 @@ export default function CreateSessionPage() {
   const [description, setDescription] = useState("");
   const [targetEndDate, setTargetEndDate] = useState("");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +46,44 @@ export default function CreateSessionPage() {
     }
   };
 
+  const coverPreviewRef = useRef<string | null>(null);
+
+  // Set the picked cover and swap its local preview, revoking the previous object URL.
+  const applyCoverFile = (file: File | null, input?: HTMLInputElement) => {
+    if (coverPreviewRef.current) URL.revokeObjectURL(coverPreviewRef.current);
+    coverPreviewRef.current = file ? URL.createObjectURL(file) : null;
+    setCoverFile(file);
+    setCoverPreview(coverPreviewRef.current);
+    if (!file && input) input.value = "";
+  };
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setError("Cover image must be a JPG, PNG or WebP file.");
+      applyCoverFile(null, e.target);
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Cover image must be under 5MB.");
+      applyCoverFile(null, e.target);
+      return;
+    }
+
+    setError(null);
+    applyCoverFile(file);
+  };
+
+  // Release the last preview object URL when the form unmounts.
+  useEffect(() => {
+    return () => {
+      if (coverPreviewRef.current) URL.revokeObjectURL(coverPreviewRef.current);
+    };
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
@@ -61,12 +101,53 @@ export default function CreateSessionPage() {
 
     try {
       let uploadedPdfUrl: string | null = null;
+      let uploadedCoverUrl: string | null = null;
+      const sanitizedName = title.trim().toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30);
 
-      // 1. Upload PDF if selected
+      // 1. Upload cover image if selected
+      if (coverFile) {
+        setUploadStatus("Uploading cover image...");
+        const coverExt =
+          coverFile.type === "image/png" ? "png" : coverFile.type === "image/webp" ? "webp" : "jpg";
+        const coverPath = `${user.id}/${Date.now()}-${sanitizedName}.${coverExt}`;
+
+        const { error: coverUploadError } = await supabase.storage
+          .from("book-cover-image")
+          .upload(coverPath, coverFile, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (coverUploadError) {
+          // Storage errors here are usually project setup, not user error, so name the fix.
+          const storageMessage = coverUploadError.message.toLowerCase();
+          if (storageMessage.includes("bucket not found")) {
+            throw new Error(
+              "Could not upload the cover image: the 'book-cover-image' bucket does not exist. Run supabase/create_book_cover_bucket.sql in the Supabase SQL editor."
+            );
+          }
+          if (storageMessage.includes("row-level security")) {
+            throw new Error(
+              "Could not upload the cover image: Supabase storage denied the upload (row-level security). The 'book-cover-image' bucket exists but its insert policy is missing — run supabase/create_book_cover_bucket.sql in the Supabase SQL editor."
+            );
+          }
+          throw new Error(`Could not upload the cover image: ${coverUploadError.message}`);
+        }
+
+        const { data: coverUrlData } = supabase.storage
+          .from("book-cover-image")
+          .getPublicUrl(coverPath);
+
+        if (!coverUrlData?.publicUrl) {
+          throw new Error("Could not resolve the uploaded cover image URL.");
+        }
+        uploadedCoverUrl = coverUrlData.publicUrl;
+      }
+
+      // 2. Upload PDF if selected
       if (pdfFile) {
         setUploadStatus("Uploading PDF book...");
         const fileExt = "pdf";
-        const sanitizedName = title.trim().toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30);
         const filePath = `${user.id}/${Date.now()}-${sanitizedName}.${fileExt}`;
 
         const { error: uploadError } = await supabase.storage
@@ -89,7 +170,7 @@ export default function CreateSessionPage() {
 
       setUploadStatus("Creating reading session...");
 
-      // 2. Insert reading session
+      // 3. Insert reading session
       const { data: sessionData, error: sessionError } = await supabase
         .from("reading_sessions")
         .insert({
@@ -100,6 +181,7 @@ export default function CreateSessionPage() {
           description: description.trim() || null,
           target_end_date: targetEndDate || null,
           pdf_url: uploadedPdfUrl,
+          cover_image_url: uploadedCoverUrl,
           status: "active",
         })
         .select()
@@ -107,7 +189,7 @@ export default function CreateSessionPage() {
 
       if (sessionError) throw sessionError;
 
-      // 3. Auto-join creator to session
+      // 4. Auto-join creator to session
       await supabase.from("session_members").insert({
         session_id: sessionData.id,
         user_id: user.id,
@@ -132,7 +214,7 @@ export default function CreateSessionPage() {
 
   if (authLoading) {
     return (
-      <div className="max-w-xl mx-auto px-4 py-16 text-center text-sm text-stone-500 font-medium">
+      <div className="max-w-xl mx-auto px-4 py-16 text-center text-sm text-muted-ink font-medium">
         Loading...
       </div>
     );
@@ -140,14 +222,14 @@ export default function CreateSessionPage() {
 
   if (!user) {
     return (
-      <Card className="max-w-md mx-auto my-16 p-8 text-center space-y-4 rounded-3xl">
-        <BookOpen className="w-10 h-10 text-amber-600 mx-auto" />
+      <Card className="max-w-md mx-auto my-16 p-8 text-center space-y-4 rounded-card">
+        <BookOpen className="w-10 h-10 text-gold-ink mx-auto" />
         <h2 className="font-serif text-xl font-bold">Sign In Required</h2>
-        <p className="text-sm text-stone-500">
+        <p className="text-sm text-muted-ink">
           You need to be signed in to host a reading session for fellow readers.
         </p>
         <Link href="/auth/login">
-          <Button size="lg" className="rounded-xl">Sign In</Button>
+          <Button size="lg">Sign In</Button>
         </Link>
       </Card>
     );
@@ -157,29 +239,29 @@ export default function CreateSessionPage() {
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 mb-6 transition-colors"
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-ink hover:text-ink mb-6 transition-colors"
       >
         <ArrowLeft className="w-3.5 h-3.5" />
         Back to sessions
       </Link>
 
-      <Card className="rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl shadow-amber-900/5">
-        <div className="flex items-center gap-3.5 pb-6 border-b border-stone-100 dark:border-stone-800">
-          <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-stone-800 text-amber-700 dark:text-amber-400 flex items-center justify-center shadow-sm">
+      <Card className="rounded-card p-6 sm:p-8 space-y-6 shadow-xl shadow-teal/5">
+        <div className="flex items-center gap-3.5 pb-6 border-b border-line">
+          <div className="w-12 h-12 rounded-2xl bg-sand text-gold-ink flex items-center justify-center shadow-sm">
             <BookOpen className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="font-serif text-2xl font-bold text-stone-900 dark:text-stone-100">
+            <h1 className="type-h2 text-ink">
               Start a Reading Session
             </h1>
-            <p className="text-xs text-stone-500 mt-0.5">
+            <p className="text-xs text-muted-ink mt-0.5">
               Upload a book PDF, set chapter targets, and discuss with your book club
             </p>
           </div>
         </div>
 
         {error && (
-          <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-xl flex items-start gap-2.5 text-sm text-red-700 dark:text-red-300">
+          <div className="p-3.5 bg-danger/10 border border-danger/25 rounded-xl flex items-start gap-2.5 text-sm text-danger">
             <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
@@ -188,7 +270,7 @@ export default function CreateSessionPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400 mb-1.5">
+              <label className="block type-label text-muted-ink mb-1.5">
                 Book Title *
               </label>
               <Input
@@ -201,7 +283,7 @@ export default function CreateSessionPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400 mb-1.5">
+              <label className="block type-label text-muted-ink mb-1.5">
                 Author *
               </label>
               <Input
@@ -216,7 +298,7 @@ export default function CreateSessionPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400 mb-1.5">
+              <label className="block type-label text-muted-ink mb-1.5">
                 Total Chapters *
               </label>
               <Input
@@ -230,7 +312,7 @@ export default function CreateSessionPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400 mb-1.5">
+              <label className="block type-label text-muted-ink mb-1.5">
                 Target Finish Date (Optional)
               </label>
               <Input
@@ -241,12 +323,64 @@ export default function CreateSessionPage() {
             </div>
           </div>
 
+          {/* Book Cover Upload Section */}
+          <div className="space-y-1.5">
+            <label className="block type-label text-muted-ink">
+              Book Cover Image (Optional)
+            </label>
+            <div className="border-2 border-dashed border-line rounded-2xl p-4 sm:p-5 hover:border-gold/70 transition-colors bg-canvas/60">
+              <input
+                type="file"
+                id="cover-upload"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleCoverChange}
+                className="hidden"
+              />
+              <label
+                htmlFor="cover-upload"
+                className="cursor-pointer flex items-center gap-4"
+              >
+                <div className="w-14 h-20 rounded-xl overflow-hidden bg-linear-to-br from-cream-deep via-sand to-[#dcc5a4] flex items-center justify-center flex-shrink-0 shadow-sm border border-gold/30">
+                  {coverPreview ? (
+                    <img
+                      src={coverPreview}
+                      alt="Selected book cover preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <ImagePlus className="w-5 h-5 text-ink" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  {coverFile ? (
+                    <div className="flex items-center gap-2 text-gold-ink font-semibold text-sm">
+                      <CheckCircle2 className="w-4 h-4 text-sage flex-shrink-0" />
+                      <span className="truncate">{coverFile.name}</span>
+                      <span className="text-xs text-muted-ink/80 font-normal flex-shrink-0">
+                        ({(coverFile.size / (1024 * 1024)).toFixed(2)} MB)
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="block text-xs sm:text-sm font-semibold text-ink">
+                        Click to upload a cover image
+                      </span>
+                      <span className="block text-[11px] text-muted-ink/80 mt-0.5">
+                        JPG, PNG or WebP up to 5MB. Without one, sessions use the default book cover.
+                      </span>
+                    </>
+                  )}
+                </div>
+              </label>
+            </div>
+          </div>
+
           {/* Book PDF Upload Section */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
+            <label className="block type-label text-muted-ink">
               Book PDF File (Optional)
             </label>
-            <div className="border-2 border-dashed border-stone-200 dark:border-stone-800 rounded-2xl p-4 sm:p-6 text-center hover:border-amber-400/80 transition-colors bg-[#FAF9F6] dark:bg-stone-900/50">
+            <div className="border-2 border-dashed border-line rounded-2xl p-4 sm:p-6 text-center hover:border-gold/70 transition-colors bg-canvas/60">
               <input
                 type="file"
                 id="pdf-upload"
@@ -259,22 +393,22 @@ export default function CreateSessionPage() {
                 className="cursor-pointer flex flex-col items-center justify-center gap-2"
               >
                 {pdfFile ? (
-                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-semibold text-sm">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <div className="flex items-center gap-2 text-gold-ink font-semibold text-sm">
+                    <CheckCircle2 className="w-5 h-5 text-sage" />
                     <span>{pdfFile.name}</span>
-                    <span className="text-xs text-stone-400 font-normal">
+                    <span className="text-xs text-muted-ink/80 font-normal">
                       ({(pdfFile.size / (1024 * 1024)).toFixed(2)} MB)
                     </span>
                   </div>
                 ) : (
                   <>
-                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 dark:bg-stone-800 dark:text-amber-400 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-sand text-gold-ink flex items-center justify-center">
                       <Upload className="w-5 h-5" />
                     </div>
-                    <span className="text-xs sm:text-sm font-semibold text-stone-800 dark:text-stone-200">
+                    <span className="text-xs sm:text-sm font-semibold text-ink">
                       Click to upload book PDF
                     </span>
-                    <span className="text-[11px] text-stone-400">
+                    <span className="text-[11px] text-muted-ink/80">
                       PDF documents up to 50MB for members to read directly in the session
                     </span>
                   </>
@@ -284,7 +418,7 @@ export default function CreateSessionPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400 mb-1.5">
+            <label className="block type-label text-muted-ink mb-1.5">
               Reading Goals & Overview
             </label>
             <Textarea
@@ -301,7 +435,7 @@ export default function CreateSessionPage() {
               type="submit"
               disabled={loading}
               size="lg"
-              className="w-full gap-2 shadow-md shadow-amber-600/20"
+              className="w-full gap-2 shadow-md shadow-teal/15"
             >
               <Plus className="w-4 h-4" />
               <span>

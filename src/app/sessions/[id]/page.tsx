@@ -9,6 +9,7 @@ import { ReadingSession, SessionMember, Profile } from "@/types/database";
 import { ProgressUpdater } from "@/components/ProgressUpdater";
 import { DiscussionThread } from "@/components/DiscussionThread";
 import { PdfViewer } from "@/components/PdfViewer";
+import { BookCover } from "@/components/BookCover";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -22,6 +23,8 @@ import {
   Upload,
   Users,
   Crown,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 interface MemberWithProfile extends SessionMember {
@@ -46,6 +49,8 @@ export default function SessionDetailPage({
   const [joining, setJoining] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const loadSessionDetails = async () => {
     try {
@@ -147,6 +152,63 @@ export default function SessionDetailPage({
     }
   };
 
+  const storagePathFromUrl = (url: string | null, bucket: string) => {
+    if (!url) return null;
+    const marker = `/object/public/${bucket}/`;
+    const index = url.indexOf(marker);
+    if (index === -1) return null;
+    return decodeURIComponent(url.slice(index + marker.length).split("?")[0]);
+  };
+
+  const handleDeleteSession = async () => {
+    if (!session || !user || user.id !== session.creator_id || deleting) return;
+
+    if (
+      !confirm(
+        `Delete "${session.title}"? Its discussion thread and member progress will be removed. This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setDeleting(true);
+    setActionError(null);
+
+    try {
+      const { error: deleteError } = await supabase
+        .from("reading_sessions")
+        .delete()
+        .eq("id", session.id);
+
+      if (deleteError) throw deleteError;
+
+      // Best effort: drop this session's uploaded files, ignoring storage failures.
+      const files = [
+        { bucket: "session_pdfs", path: storagePathFromUrl(session.pdf_url, "session_pdfs") },
+        {
+          bucket: "book-cover-image",
+          path: storagePathFromUrl(session.cover_image_url, "book-cover-image"),
+        },
+      ].filter((file): file is { bucket: string; path: string } => Boolean(file.path));
+
+      if (files.length > 0) {
+        await Promise.allSettled(
+          files.map((file) => supabase.storage.from(file.bucket).remove([file.path]))
+        );
+      }
+
+      router.push("/");
+      router.refresh();
+    } catch (err: unknown) {
+      console.error("Error deleting session:", err);
+      setActionError(
+        err instanceof Error ? err.message : "Failed to delete the session. Please try again."
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user || !session || user.id !== session.creator_id) return;
@@ -214,8 +276,8 @@ export default function SessionDetailPage({
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-20 flex flex-col items-center gap-3">
-        <div className="w-10 h-10 border-[3px] border-amber-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-stone-500 font-medium">Loading reading session…</p>
+        <div className="w-10 h-10 border-[3px] border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-muted-ink font-medium">Loading reading session…</p>
       </div>
     );
   }
@@ -223,10 +285,10 @@ export default function SessionDetailPage({
   if (!session) {
     return (
       <div className="max-w-md mx-auto my-16 text-center px-4">
-        <Card className="p-10 rounded-3xl space-y-4">
-          <BookOpen className="w-10 h-10 text-amber-600 mx-auto" />
+        <Card className="p-10 rounded-card space-y-4">
+          <BookOpen className="w-10 h-10 text-gold-ink mx-auto" />
           <h2 className="font-serif text-2xl font-bold">Session Not Found</h2>
-          <p className="text-sm text-stone-500">
+          <p className="text-sm text-muted-ink">
             This reading session may have been removed or does not exist.
           </p>
           <Link href="/">
@@ -256,13 +318,38 @@ export default function SessionDetailPage({
       <div className="flex items-center justify-between">
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-ink hover:text-ink transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           Back to sessions
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {isCreator && (
+            <>
+              <Link href={`/sessions/${session.id}/edit`}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-gold-ink" />
+                  Edit
+                </Button>
+              </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDeleteSession}
+                disabled={deleting}
+                className="gap-1.5 text-xs text-muted-ink/80 hover:text-danger hover:bg-danger/10"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {deleting ? "Deleting…" : "Delete"}
+              </Button>
+            </>
+          )}
+
           {/* Creator PDF Upload if no PDF yet */}
           {isCreator && !session.pdf_url && (
             <label className="cursor-pointer">
@@ -278,10 +365,10 @@ export default function SessionDetailPage({
                 size="sm"
                 asChild
                 disabled={uploadingPdf}
-                className="gap-1.5 text-xs rounded-xl"
+                className="gap-1.5 text-xs"
               >
                 <span>
-                  <Upload className="w-3.5 h-3.5 text-amber-600" />
+                  <Upload className="w-3.5 h-3.5 text-gold-ink" />
                   {uploadingPdf ? "Uploading…" : "Upload Book PDF"}
                 </span>
               </Button>
@@ -293,7 +380,7 @@ export default function SessionDetailPage({
               onClick={handleJoinSession}
               disabled={joining}
               size="sm"
-              className="gap-1.5 text-xs rounded-xl shadow-sm"
+              className="gap-1.5 text-xs shadow-sm"
             >
               <UserPlus className="w-3.5 h-3.5" />
               {joining ? "Joining…" : "Join Session"}
@@ -304,7 +391,7 @@ export default function SessionDetailPage({
                 variant="ghost"
                 size="sm"
                 onClick={handleLeaveSession}
-                className="text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 text-xs rounded-xl"
+                className="text-muted-ink/80 hover:text-danger hover:bg-danger/10 text-xs rounded-xl"
               >
                 <LogOut className="w-3.5 h-3.5 mr-1" />
                 Leave
@@ -314,27 +401,38 @@ export default function SessionDetailPage({
         </div>
       </div>
 
+      {/* Session Action Error */}
+      {actionError && (
+        <div className="p-3.5 bg-danger/10 border border-danger/25 text-danger text-xs rounded-xl leading-relaxed">
+          ⚠️ {actionError}
+        </div>
+      )}
+
       {/* Upload Error */}
       {uploadError && (
-        <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-300 text-xs rounded-xl leading-relaxed">
+        <div className="p-3.5 bg-danger/10 border border-danger/25 text-danger text-xs rounded-xl leading-relaxed">
           ⚠️ {uploadError}
         </div>
       )}
 
       {/* ── Session Header Card ── */}
-      <Card className="relative overflow-hidden p-5 sm:p-7 rounded-3xl border-stone-200/80 dark:border-stone-800 bg-white/90 dark:bg-stone-900/90 backdrop-blur-sm shadow-sm">
+      <Card className="relative overflow-hidden p-5 sm:p-7 rounded-card border-line bg-card backdrop-blur-sm shadow-sm">
         {/* Top accent stripe */}
-        <div className="absolute top-0 inset-x-0 h-1 bg-linear-to-r from-amber-400 via-amber-500 to-rose-400" />
+        <div className="absolute top-0 inset-x-0 h-1 bg-linear-to-r from-gold via-gold to-[#b9834f]" />
 
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 pt-1">
-          {/* Book cover mockup + info */}
+          {/* Book cover + info */}
           <div className="flex items-start gap-4">
-            <div className="w-16 h-24 sm:w-20 sm:h-28 rounded-2xl bg-linear-to-br from-amber-200 via-amber-300 to-amber-500 dark:from-stone-700 dark:to-stone-600 flex flex-col items-center justify-center p-2.5 text-center shadow-md flex-shrink-0">
-              <BookOpen className="w-7 h-7 sm:w-8 sm:h-8 text-amber-950 dark:text-amber-200 mb-1" />
-              <span className="text-[10px] sm:text-[11px] font-extrabold text-amber-950 dark:text-amber-100 uppercase tracking-tighter leading-tight">
+            <BookCover
+              url={session.cover_image_url}
+              alt={`${session.title} cover`}
+              className="w-16 h-24 sm:w-20 sm:h-28 rounded-2xl bg-linear-to-br from-cream-deep via-sand to-[#dcc5a4] flex flex-col items-center justify-center p-2.5 text-center shadow-md flex-shrink-0"
+            >
+              <BookOpen className="w-7 h-7 sm:w-8 sm:h-8 text-teal mb-1" />
+              <span className="text-[10px] sm:text-[11px] font-extrabold text-teal uppercase tracking-tighter leading-tight">
                 {session.total_chapters} Chs
               </span>
-            </div>
+            </BookCover>
 
             <div className="min-w-0">
               {/* Status + PDF badge */}
@@ -348,16 +446,16 @@ export default function SessionDetailPage({
                 {session.pdf_url && (
                   <Badge
                     variant="secondary"
-                    className="gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 dark:bg-amber-950/50 dark:text-amber-300"
+                    className="gap-1 text-[10px] font-bold text-ink bg-sand"
                   >
-                    <FileText className="w-3 h-3 text-amber-600" />
+                    <FileText className="w-3 h-3 text-gold-ink" />
                     PDF Attached
                   </Badge>
                 )}
                 {isCreator && (
                   <Badge
                     variant="secondary"
-                    className="gap-1 text-[10px] font-bold text-violet-800 bg-violet-100 dark:bg-violet-950/50 dark:text-violet-300"
+                    className="gap-1 text-[10px] font-bold text-ink bg-sand"
                   >
                     <Crown className="w-3 h-3" />
                     Host
@@ -365,34 +463,34 @@ export default function SessionDetailPage({
                 )}
               </div>
 
-              <h1 className="font-serif text-xl sm:text-2xl md:text-3xl font-bold text-stone-900 dark:text-stone-100 leading-tight">
+              <h1 className="type-h2 text-2xl md:text-3xl text-ink">
                 {session.title}
               </h1>
-              <p className="text-xs sm:text-sm font-medium text-stone-500 dark:text-stone-400 mt-0.5">
+              <p className="text-xs sm:text-sm font-medium text-muted-ink mt-0.5">
                 by {session.author}
               </p>
 
-              <div className="flex flex-wrap items-center gap-3 mt-2.5 text-xs text-stone-500">
+              <div className="flex flex-wrap items-center gap-3 mt-2.5 text-xs text-muted-ink">
                 <span className="flex items-center gap-1.5">
-                  <div className="w-5 h-5 rounded-full bg-linear-to-tr from-amber-500 to-rose-400 flex items-center justify-center text-white font-bold text-[9px]">
+                  <div className="w-5 h-5 rounded-full bg-linear-to-tr from-teal to-teal-soft flex items-center justify-center text-cream font-bold text-[9px]">
                     {host?.username?.charAt(0).toUpperCase() || "H"}
                   </div>
                   <span>
                     Hosted by{" "}
-                    <span className="font-bold text-stone-700 dark:text-stone-300">
+                    <span className="font-bold text-ink">
                       {host?.full_name || host?.username || "Host"}
                     </span>
                   </span>
                 </span>
                 <span className="flex items-center gap-1">
-                  <Users className="w-3.5 h-3.5 text-amber-600" />
+                  <Users className="w-3.5 h-3.5 text-gold-ink" />
                   <span className="font-semibold">
                     {members.length} {members.length === 1 ? "member" : "members"}
                   </span>
                 </span>
                 {session.target_end_date && (
                   <span className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                    <Calendar className="w-3.5 h-3.5 text-gold-ink" />
                     Target: {session.target_end_date}
                   </span>
                 )}
@@ -420,7 +518,7 @@ export default function SessionDetailPage({
         </div>
 
         {session.description && (
-          <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-300 leading-relaxed mt-4 pt-4 border-t border-stone-100 dark:border-stone-800">
+          <p className="text-xs sm:text-sm text-muted-ink leading-relaxed mt-4 pt-4 border-t border-line">
             {session.description}
           </p>
         )}
@@ -429,7 +527,7 @@ export default function SessionDetailPage({
       {/* ── Members Leaderboard strip ── */}
       {members.length > 0 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider whitespace-nowrap flex-shrink-0">
+          <span className="text-[11px] font-bold text-muted-ink/80 uppercase tracking-wider whitespace-nowrap flex-shrink-0">
             Readers:
           </span>
           {members.map((m) => {
@@ -440,16 +538,16 @@ export default function SessionDetailPage({
               <div
                 key={m.user_id}
                 title={`${m.profile?.full_name || m.profile?.username || "Reader"} — Ch. ${m.current_chapter}/${session.total_chapters}`}
-                className="flex-shrink-0 flex items-center gap-1.5 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-full px-2.5 py-1 text-[11px] font-medium text-stone-700 dark:text-stone-300"
+                className="flex-shrink-0 flex items-center gap-1.5 bg-card border border-line rounded-full px-2.5 py-1 text-[11px] font-medium text-ink"
               >
-                <div className="w-5 h-5 rounded-full bg-linear-to-tr from-amber-500 to-rose-400 text-white flex items-center justify-center font-bold text-[9px] flex-shrink-0">
+                <div className="w-5 h-5 rounded-full bg-linear-to-tr from-teal to-teal-soft text-cream flex items-center justify-center font-bold text-[9px] flex-shrink-0">
                   {m.profile?.username?.charAt(0).toUpperCase() || "R"}
                 </div>
                 <span className="max-w-[80px] truncate">
                   {m.profile?.username || "Reader"}
                 </span>
-                <span className="text-amber-600 font-bold">{pct}%</span>
-                {m.is_completed && <span className="text-emerald-500">✓</span>}
+                <span className="text-gold-ink font-bold">{pct}%</span>
+                {m.is_completed && <span className="text-sage">✓</span>}
               </div>
             );
           })}
@@ -463,15 +561,15 @@ export default function SessionDetailPage({
           {session.pdf_url ? (
             <PdfViewer pdfUrl={session.pdf_url} bookTitle={session.title} />
           ) : (
-            <Card className="rounded-3xl border-dashed bg-white/60 dark:bg-stone-900/60 flex flex-col items-center justify-center text-center p-10 sm:p-14 space-y-5 min-h-[380px]">
-              <div className="w-16 h-16 rounded-2xl bg-amber-100 dark:bg-stone-800 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+            <Card className="rounded-card border-dashed bg-card flex flex-col items-center justify-center text-center p-10 sm:p-14 space-y-5 min-h-[380px]">
+              <div className="w-16 h-16 rounded-2xl bg-sand text-gold-ink flex items-center justify-center">
                 <FileText className="w-8 h-8" />
               </div>
               <div className="max-w-sm space-y-1.5">
-                <h3 className="font-serif text-lg font-bold text-stone-900 dark:text-stone-100">
+                <h3 className="font-serif text-lg font-bold text-ink">
                   No PDF Book Yet
                 </h3>
-                <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
+                <p className="text-xs sm:text-sm text-muted-ink leading-relaxed">
                   {isCreator
                     ? "Upload the book PDF so members can read it directly here, alongside the discussion."
                     : "The host hasn't uploaded a PDF copy yet. You can still track chapters and join the discussion!"}
@@ -487,7 +585,7 @@ export default function SessionDetailPage({
                     disabled={uploadingPdf}
                     className="hidden"
                   />
-                  <Button size="sm" asChild disabled={uploadingPdf} className="gap-2 shadow-md shadow-amber-600/20">
+                  <Button size="sm" asChild disabled={uploadingPdf} className="gap-2 shadow-md shadow-teal/15">
                     <span>
                       <Upload className="w-4 h-4" />
                       {uploadingPdf ? "Uploading…" : "Upload Session PDF"}
@@ -503,6 +601,7 @@ export default function SessionDetailPage({
         <div className="lg:col-span-5 xl:col-span-4 order-1 lg:order-2">
           <DiscussionThread
             sessionId={session.id}
+            sessionCreatorId={session.creator_id}
             isMember={!!userMembership}
             totalChapters={session.total_chapters}
             memberProgressMap={memberProgressMap}
