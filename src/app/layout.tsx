@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { Navbar, MobileNav } from "@/components/Navbar";
-
+import { Analytics } from "@vercel/analytics/next"
 
 const siteUrl = new URL(
   process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
@@ -42,6 +42,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <Analytics />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
